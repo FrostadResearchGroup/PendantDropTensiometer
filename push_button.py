@@ -10,15 +10,26 @@ from PyQt4 import QtGui
 from onebuttongui import Ui_MainWindow
 
 class oneButtonExample(QtGui.QMainWindow, Ui_MainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None): #note to self: double underscore!
         super(oneButtonExample,self).__init__(parent)
         self.counter = 0
+        self.reset
         self.setupUi(self)
-        self.pushButton.clicked.connect(self.showDialog)
+        self.counterUpButton.clicked.connect(self.counterUp)
+        self.counterDownButton.clicked.connect(self.counterDown)
+        self.resetButton.clicked.connect(self.reset)
         
-    def showDialog(self):
+    def counterUp(self):
         self.counter += 1
-        print self.counter
+        self.lcdNumber.display(self.counter)
+        
+    def counterDown(self):
+        self.counter += -1
+        self.lcdNumber.display(self.counter)
+        
+    def reset(self):
+        self.counter = 0
+        self.lcdNumber.display(self.counter)
         
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)

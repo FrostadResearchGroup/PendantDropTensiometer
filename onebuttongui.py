@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'onebuttongui.ui'
 #
-# Created: Mon Oct 03 10:42:14 2016
+# Created: Mon Oct 03 11:50:15 2016
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,16 +26,21 @@ except AttributeError:
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
-        MainWindow.resize(558, 353)
+        MainWindow.resize(519, 358)
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
-        self.pushButton = QtGui.QPushButton(self.centralwidget)
-        self.pushButton.setGeometry(QtCore.QRect(210, 140, 112, 34))
-        self.pushButton.setObjectName(_fromUtf8("pushButton"))
-        self.label = QtGui.QLabel(self.centralwidget)
-        self.label.setGeometry(QtCore.QRect(230, 80, 70, 21))
-        self.label.setText(_fromUtf8(""))
-        self.label.setObjectName(_fromUtf8("label"))
+        self.counterUpButton = QtGui.QPushButton(self.centralwidget)
+        self.counterUpButton.setGeometry(QtCore.QRect(90, 80, 112, 34))
+        self.counterUpButton.setObjectName(_fromUtf8("counterUpButton"))
+        self.counterDownButton = QtGui.QPushButton(self.centralwidget)
+        self.counterDownButton.setGeometry(QtCore.QRect(90, 140, 121, 34))
+        self.counterDownButton.setObjectName(_fromUtf8("counterDownButton"))
+        self.resetButton = QtGui.QPushButton(self.centralwidget)
+        self.resetButton.setGeometry(QtCore.QRect(90, 200, 112, 34))
+        self.resetButton.setObjectName(_fromUtf8("resetButton"))
+        self.lcdNumber = QtGui.QLCDNumber(self.centralwidget)
+        self.lcdNumber.setGeometry(QtCore.QRect(320, 100, 131, 121))
+        self.lcdNumber.setObjectName(_fromUtf8("lcdNumber"))
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtGui.QStatusBar(MainWindow)
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
@@ -46,5 +51,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow", None))
-        self.pushButton.setText(_translate("MainWindow", "Push Button!", None))
+        self.counterUpButton.setText(_translate("MainWindow", "Counter Up", None))
+        self.counterDownButton.setText(_translate("MainWindow", "Counter Down", None))
+        self.resetButton.setText(_translate("MainWindow", "Reset", None))
 
