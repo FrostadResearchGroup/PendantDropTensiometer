@@ -240,6 +240,7 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
             self.dropCoord[k,1] = self.dropMidPointY - (self.dropCoord[k,1]-self.dropMidPointY)
        
         print self.dropCoord
+        np.savetxt('testfile.txt',self.dropCoord,delimiter=',',fmt="%i")
         self.mplwidget.axes.scatter(self.dropCoord[:,0],self.dropCoord[:,1],color = 'red')
         self.mplwidget.axes.invert_yaxis()
         self.mplwidget.figure.canvas.draw()
