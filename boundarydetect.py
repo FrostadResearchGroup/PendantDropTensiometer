@@ -224,6 +224,9 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
             print self.dropCoord
             self.translate_drop()
             
+        else:
+            print("Draw line first!")
+            
     def translate_drop(self):
         #centers the drop   
         self.translationFactorX = (self.dropCoord[1,0]+self.dropCoord[0,0])*0.5
