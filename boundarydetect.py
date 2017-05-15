@@ -52,7 +52,6 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         #set up buttons
         self.selectImageButton.clicked.connect(self.select_image)
         self.detectBoundaryButton.clicked.connect(self.detect_boundary)
-        self.getCoordButton.clicked.connect(self.get_interface_coordinates)
         self.calculateMRButton.clicked.connect(self.get_rotation_angle)
         self.removeTubeButton.clicked.connect(self.isolate_drop)
         
@@ -62,7 +61,6 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
     def reset(self):
         self.mplwidget.axes.hold(False)
         self.detectBoundaryButton.setEnabled(False)
-        self.getCoordButton.setEnabled(False)
         self.diameterSpinBox.setEnabled(False)
         self.calculateMRButton.setEnabled(False)
         self.removeTubeButton.setEnabled(False)
@@ -94,7 +92,7 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
             self.edges = feature.canny(self.image_binary,sigma=3)
             self.mplwidget.axes.imshow(self.edges,cmap='gray')
             self.mplwidget.figure.canvas.draw()
-            self.getCoordButton.setEnabled(True)
+            self.get_interface_coordinates()
 
     def get_interface_coordinates(self):
         #MAIN OBJ: get the coordinates of the edges

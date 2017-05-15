@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'boundarydetect_gui.ui'
 #
-# Created: Mon May 01 13:01:02 2017
+# Created: Mon May 15 14:48:42 2017
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -54,15 +54,12 @@ class Ui_MainWindow(object):
         self.gridLayout_4.addLayout(self.gridLayout_3, 3, 0, 1, 1)
         self.gridLayout_2 = QtGui.QGridLayout()
         self.gridLayout_2.setObjectName(_fromUtf8("gridLayout_2"))
-        self.selectImageButton = QtGui.QPushButton(self.centralwidget)
-        self.selectImageButton.setObjectName(_fromUtf8("selectImageButton"))
-        self.gridLayout_2.addWidget(self.selectImageButton, 0, 0, 1, 1)
         self.detectBoundaryButton = QtGui.QPushButton(self.centralwidget)
         self.detectBoundaryButton.setObjectName(_fromUtf8("detectBoundaryButton"))
         self.gridLayout_2.addWidget(self.detectBoundaryButton, 0, 1, 1, 1)
-        self.getCoordButton = QtGui.QPushButton(self.centralwidget)
-        self.getCoordButton.setObjectName(_fromUtf8("getCoordButton"))
-        self.gridLayout_2.addWidget(self.getCoordButton, 0, 2, 1, 1)
+        self.selectImageButton = QtGui.QPushButton(self.centralwidget)
+        self.selectImageButton.setObjectName(_fromUtf8("selectImageButton"))
+        self.gridLayout_2.addWidget(self.selectImageButton, 0, 0, 1, 1)
         self.gridLayout_4.addLayout(self.gridLayout_2, 2, 0, 1, 1)
         self.removeTubeButton = QtGui.QPushButton(self.centralwidget)
         self.removeTubeButton.setObjectName(_fromUtf8("removeTubeButton"))
@@ -84,9 +81,8 @@ class Ui_MainWindow(object):
         self.calculateMRButton.setText(_translate("MainWindow", "Calculate Magnification Ratio and Angle", None))
         self.capillaryDiameterLabel.setText(_translate("MainWindow", "Capillary Diameter", None))
         self.lengthUnitLabel.setText(_translate("MainWindow", "mm", None))
-        self.selectImageButton.setText(_translate("MainWindow", "Select Image", None))
         self.detectBoundaryButton.setText(_translate("MainWindow", "Detect Boundary", None))
-        self.getCoordButton.setText(_translate("MainWindow", "Get Coordinates", None))
+        self.selectImageButton.setText(_translate("MainWindow", "Select Image", None))
         self.removeTubeButton.setText(_translate("MainWindow", "Remove Capillary Tube", None))
 
 from matplotlibwidget import MatplotlibWidget
