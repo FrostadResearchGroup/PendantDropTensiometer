@@ -9,7 +9,7 @@ from PyQt4 import QtGui
 import math
 from scipy import stats
 from PyQt4.QtGui import QFileDialog
-from boundarydetect_gui import Ui_MainWindow
+from pendantdrop_gui import Ui_MainWindow
 from skimage import feature
 import matplotlib.image as mpimg
 import cv2
@@ -56,25 +56,39 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         self.removeTubeButton.clicked.connect(self.isolate_drop)
         
         #disable buttons until setup is complete
-        self.reset()
+        self.reset_1st_stage()
     
-    def reset(self):
-        self.mplwidget.axes.hold(False)
-        self.detectBoundaryButton.setEnabled(False)
-        self.diameterSpinBox.setEnabled(False)
-        self.calculateMRButton.setEnabled(False)
-        self.removeTubeButton.setEnabled(False)
+    def reset_1st_stage(self):      
         self.mplwidget.axes.clear()
+        self.mplwidget.figure.canvas.draw_idle()
+        self.detectBoundaryButton.setEnabled(False)
+        self.reset_2nd_stage()
+
+    def reset_2nd_stage(self):
         self.edges = []
         self.intcoord = []
         self.dropCoord = []
+        self.lineCoord = []
+        self.adjLineCoord = []
+        self.mplwidget2.axes.hold(False)
+        self.mplwidget2.axes.clear()
+        self.mplwidget2.figure.canvas.draw_idle()
+        self.mplwidget3.axes.clear()
+        self.mplwidget3.figure.canvas.draw_idle()
+        self.diameterSpinBox.setEnabled(False)
+        self.calculateMRButton.setEnabled(False)
+        self.removeTubeButton.setEnabled(False)
         self.diameterSpinBox.setValue(0)
+        self.diameterSpinBox.setEnabled(False)
+        self.rotationAngleDisplay.setText("-")
+        self.magRatioDisplay.setText("-")
+        self.statusLabel.setText("")
         
     def select_image(self):
         #get image path from explorer, then clear previous image
         image_path = QFileDialog.getOpenFileName(self, 'Open file', 
          'c:\\',"Image files (*.jpg)")
-        self.reset()
+        self.reset_1st_stage()
         
         #open image based on path, turn it into binary color using Otsu's method
         self.image = mpimg.imread(image_path,0)
@@ -89,9 +103,10 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
     def detect_boundary(self):
         #MAIN OBJ: detect image edges
         if(self.image_binary is not None):
+            self.reset_2nd_stage()
             self.edges = feature.canny(self.image_binary,sigma=3)
-            self.mplwidget.axes.imshow(self.edges,cmap='gray')
-            self.mplwidget.figure.canvas.draw()
+            self.mplwidget2.axes.imshow(self.edges,cmap='gray')
+            self.mplwidget2.figure.canvas.draw()
             self.get_interface_coordinates()
 
     def get_interface_coordinates(self):
@@ -112,14 +127,14 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
                     
             self.intcoord = np.array(self.intcoord)
             print "boundary coordinates are ",self.intcoord
-            self.mplwidget.axes.scatter(self.intcoord[:,0],self.intcoord[:,1])
-            self.mplwidget.axes.hold(True)
-            self.mplwidget.figure.canvas.draw()
+            self.mplwidget2.axes.scatter(self.intcoord[:,0],self.intcoord[:,1])
+            self.mplwidget2.axes.hold(True)
+            self.mplwidget2.figure.canvas.draw()
             self.diameterSpinBox.setEnabled(True)
             self.calculateMRButton.setEnabled(True)
 
         else:
-            print("Analyze picture first!")
+            self.statusLabel.setText("Analyze image first")
                 
     def get_rotation_angle(self):
         #MAIN OBJ: get the rotation angle of the camera
@@ -138,7 +153,7 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         
         #trig function to calculate angle (in rads) using the slopes of 2 lines
         self.rotationAngle = math.atan((self.inverseSlope-self.flatLineSlope)/(1+(self.inverseSlope*self.flatLineSlope)))
-        print "rotation angle is ", self.rotationAngle
+        self.rotationAngleDisplay.setText(str(self.rotationAngle))
         self.get_magnification_ratio() 
         
     def get_magnification_ratio(self):
@@ -153,7 +168,7 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         self.lineDistance = self.get_line_distance(self.lineEnds1,self.lineEnds2)
         self.diameter = self.diameterSpinBox.value()
         self.magnificationRatio = self.diameter/self.lineDistance
-        print "magnification ratio is ",self.magnificationRatio
+        self.magRatioDisplay.setText(str(self.magnificationRatio))
         self.draw_cutoff_line()
         
     def get_line_distance(self, line1, line2):
@@ -183,7 +198,7 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         
     def draw_cutoff_line(self):
         #draw the cutoff line
-        self.cutoffLine, = self.mplwidget.axes.plot([],[])
+        self.cutoffLine, = self.mplwidget2.axes.plot([],[])
         self.lineBuilder = LineBuilder(self.cutoffLine)
         self.removeTubeButton.setEnabled(True)
         
@@ -197,9 +212,8 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
     def isolate_drop(self):
         #checks whether point is above or below line using the calculate_cross_product function above
         #if line_position is above (True), keep looping, else is below (False) therefore stop looping
-        self.mplwidget.axes.hold(False)
-        self.linePosition = True
-        if self.cutoffLine is not None:
+       self.linePosition = True
+       if self.cutoffLine is not None:
             self.lineCoordX = self.lineBuilder.xs
             self.lineCoordY = self.lineBuilder.ys
             
@@ -219,11 +233,10 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
                 self.dropCoord = np.delete(self.dropCoord,0,0)
                 j += 1
             
-            print self.dropCoord
             self.translate_drop()
             
-        else:
-            print("Draw line first!")
+       else:
+            self.statusLabel.setText("Draw line first!")
             
     def translate_drop(self):
         #centers the drop   
@@ -239,11 +252,10 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         for k in range(0,len(self.dropCoord)):
             self.dropCoord[k,1] = self.dropMidPointY - (self.dropCoord[k,1]-self.dropMidPointY)
        
-        print self.dropCoord
         np.savetxt('testfile.txt',self.dropCoord,delimiter=',',fmt="%i")
-        self.mplwidget.axes.scatter(self.dropCoord[:,0],self.dropCoord[:,1],color = 'red')
-        self.mplwidget.axes.invert_yaxis()
-        self.mplwidget.figure.canvas.draw()
+        
+        self.mplwidget3.axes.scatter(self.dropCoord[:,0],self.dropCoord[:,1],color = 'red')
+        self.mplwidget3.figure.canvas.draw()
         
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
