@@ -52,9 +52,9 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         #set up buttons
         self.selectImageButton.clicked.connect(self.select_image)
         self.detectBoundaryButton.clicked.connect(self.detect_boundary)
-        self.calculateMRButton.clicked.connect(self.get_rotation_angle)
         self.removeTubeButton.clicked.connect(self.isolate_drop)
-        
+        self.diameterSpinBox.valueChanged.connect(self.get_rotation_angle)
+    
         #disable buttons until setup is complete
         self.reset_1st_stage()
     
@@ -76,7 +76,6 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         self.mplwidget3.axes.clear()
         self.mplwidget3.figure.canvas.draw_idle()
         self.diameterSpinBox.setEnabled(False)
-        self.calculateMRButton.setEnabled(False)
         self.removeTubeButton.setEnabled(False)
         self.diameterSpinBox.setValue(0)
         self.diameterSpinBox.setEnabled(False)
@@ -126,35 +125,41 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
                     self.intcoord = self.intcoord + [edgecoord[0]]
                     
             self.intcoord = np.array(self.intcoord)
-            print "boundary coordinates are ",self.intcoord
             self.mplwidget2.axes.scatter(self.intcoord[:,0],self.intcoord[:,1])
             self.mplwidget2.axes.hold(True)
             self.mplwidget2.figure.canvas.draw()
             self.diameterSpinBox.setEnabled(True)
-            self.calculateMRButton.setEnabled(True)
-
+            self.statusLabel.setText("Draw the boundary line on the second graph")
+            self.draw_cutoff_line()
+            
         else:
             self.statusLabel.setText("Analyze image first")
                 
     def get_rotation_angle(self):
         #MAIN OBJ: get the rotation angle of the camera
         #get first few initial coordinates of the capillary tube
-        self.lineCoord = self.intcoord[0:31:2]
-        self.lineCoordX = [x[0] for x in self.lineCoord]
-        self.lineCoordY = [x[1] for x in self.lineCoord]
+        self.diameter = self.diameterSpinBox.value()
+        if (self.diameter > 0):
+            self.lineCoord = self.intcoord[0:31:2]
+            self.lineCoordX = [x[0] for x in self.lineCoord]
+            self.lineCoordY = [x[1] for x in self.lineCoord]
+                
+            #calculate slope
+            slope, intercept, r_value, p_value, std_err = stats.linregress(self.lineCoordX,self.lineCoordY)
+                
+            #use the inverse slope and flat line slope to calculate since
+            #we can't compare infinite slope (vertical line) and actual slope        
+            self.inverseSlope = -1/slope
+            self.flatLineSlope = 0
+                
+            #trig function to calculate angle (in rads) using the slopes of 2 lines
+            self.rotationAngle = math.atan((self.inverseSlope-self.flatLineSlope)/(1+(self.inverseSlope*self.flatLineSlope)))
+            self.rotationAngleDisplay.setText(str(self.rotationAngle))
+            self.get_magnification_ratio() 
         
-        #calculate slope
-        slope, intercept, r_value, p_value, std_err = stats.linregress(self.lineCoordX,self.lineCoordY)
-        
-        #use the inverse slope and flat line slope to calculate since
-        #we can't compare infinite slope (vertical line) and actual slope        
-        self.inverseSlope = -1/slope
-        self.flatLineSlope = 0
-        
-        #trig function to calculate angle (in rads) using the slopes of 2 lines
-        self.rotationAngle = math.atan((self.inverseSlope-self.flatLineSlope)/(1+(self.inverseSlope*self.flatLineSlope)))
-        self.rotationAngleDisplay.setText(str(self.rotationAngle))
-        self.get_magnification_ratio() 
+        else:
+            self.rotationAngleDisplay.setText("-")
+            self.magRatioDisplay.setText("-")
         
     def get_magnification_ratio(self):
         #get the adjacent capillary tube line coordinates
@@ -166,10 +171,8 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
 
         #calculate line distance and magnification ratio
         self.lineDistance = self.get_line_distance(self.lineEnds1,self.lineEnds2)
-        self.diameter = self.diameterSpinBox.value()
         self.magnificationRatio = self.diameter/self.lineDistance
         self.magRatioDisplay.setText(str(self.magnificationRatio))
-        self.draw_cutoff_line()
         
     def get_line_distance(self, line1, line2):
         #step1: cross prod the two lines to find common perp vector
@@ -256,6 +259,20 @@ class BoundaryDetect(QtGui.QMainWindow,Ui_MainWindow):
         
         self.mplwidget3.axes.scatter(self.dropCoord[:,0],self.dropCoord[:,1],color = 'red')
         self.mplwidget3.figure.canvas.draw()
+        self.statusLabel.setText("Good to go for calculations!")
+#        self.scale_rotate_drop()
+        
+#    def scale_rotate_drop(self):
+#        self.nonDimCoord = self.dropCoord
+#        self.x0 = self.y0 = 0
+#        self.aspectRatio = self.aspRatioSpinBox.value()
+#        self.rotationAngle = np.absolute(self.rotationAngle)
+#        for i in range (0, len(self.dropCoord)-1):
+#            self.nonDimCoord[i,0] = ((self.dropCoord[i,0]/self.magnificationRatio)-self.x0)*np.cos(self.rotationAngle) + ((self.aspectRatio*self.dropCoord[i,1]/self.magnificationRatio)-self.y0)*np.sin(self.rotationAngle)
+#            self.nonDimCoord[i,1] = ((self.aspectRatio*self.dropCoord[i,1]/self.magnificationRatio)-self.x0)*np.cos(self.rotationAngle) - ((self.dropCoord[i,0]/self.magnificationRatio)-self.y0)*np.sin(self.rotationAngle)
+#        print self.nonDimCoord
+#        self.mplwidget3.axes.scatter(self.nonDimCoord[:,0],self.nonDimCoord[:,1],color = 'red')
+#        self.mplwidget3.figure.canvas.draw()
         
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
