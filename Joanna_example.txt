@@ -1,0 +1,3 @@
+#trying out Github
+print "Hello summer!"
+end
