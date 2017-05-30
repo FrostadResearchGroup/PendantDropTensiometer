@@ -10,28 +10,18 @@ from skimage import feature
 import cv2
 import numpy as np
 
-def binarize_image(image, mplwidget):
+def binarize_image(image):
     #binarize image to convert the image to purely black and white image
     blur = cv2.GaussianBlur(image,(5,5),0)
     ret3,binaryImage = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    
-    #draw binary image on matplotlibwidget
-    mplwidget.axes.imshow(binaryImage,cmap='gray')
-    mplwidget.figure.canvas.draw()
-    
     return binaryImage
     
-def detect_boundary(binaryImage, mplwidget):
+def detect_boundary(binaryImage):
     #detect the outline of the binary image
     edges = feature.canny(binaryImage,sigma=3)
-    
-    #draw outline
-    mplwidget.axes.imshow(edges,cmap='gray')
-    mplwidget.figure.canvas.draw()
-    
     return edges
     
-def get_interface_coordinates(edges, mplwidget):
+def get_interface_coordinates(edges):
     #go through each pixel in the edges image to extract the coordinates of the edges
     interfaceCoords = []
     for y in range(0,edges.shape[0]):
@@ -45,15 +35,9 @@ def get_interface_coordinates(edges, mplwidget):
         if(len(edgeCoords)==1):
             interfaceCoords = interfaceCoords + [edgeCoords[0]]      
     interfaceCoords = np.array(interfaceCoords)
-    
-    #draw the interface coordinates
-    mplwidget.axes.scatter(interfaceCoords[:,0],interfaceCoords[:,1])
-    mplwidget.axes.hold(True)
-    mplwidget.figure.canvas.draw()
-    
     return interfaceCoords
     
-def get_rotation_angle(interfaceCoords, actualDiameter):
+def get_rotation_angle(interfaceCoords):
     #get coordinates of a few points along the capillary tube
     lineCoords = interfaceCoords[0:31:2]
     lineCoordsX = [x[0] for x in lineCoords]
@@ -179,4 +163,62 @@ def scale_drop(translatedDropCoords, magnificationRatio):
     
 #For Testing Purposes    
 if __name__ == "__main__":
-    return
+    import matplotlib.pyplot as plt
+    import matplotlib.image as mpimg
+    
+    #test flags
+    flag1 = False
+    flag2 = False
+    flag3 = False
+    flag4 = False
+    flag5 = True
+    flag6 = False
+    flag7 = False
+    flag8 = False
+    flag9 = False
+    flag10 = False
+    
+    #test codes
+    #flag1 = test for binarize_image()
+    if (flag1 == True):
+        img = mpimg.imread('H2O in PDMS.jpg')
+        binarizedImage = binarize_image(img)
+        plt.imshow(binarizedImage,cmap='gray')
+    
+    #flag2 = test for detect_boundary()
+    if(flag2 == True):
+        img = mpimg.imread('H2O in PDMS.jpg')
+        binarizedImage = binarize_image(img)
+        edges = detect_boundary(binarizedImage)
+        plt.imshow(edges,cmap='gray')
+        
+    #flag3 = test for get_interface_coordinates()       
+    if(flag3 == True):
+        img = mpimg.imread('H2O in PDMS.jpg')
+        binarizedImage = binarize_image(img)
+        edges = detect_boundary(binarizedImage)
+        interfaceCoordinates = get_interface_coordinates(edges)
+        print interfaceCoordinates
+        plt.scatter(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
+        
+    #flag4 = test for get_rotation_angle()
+    if(flag4 == True):
+        #set up test array
+        testArray = []
+        for i in range(0,39):
+            testArray.append([i,i+0.5*i])
+        print testArray
+        
+        rotationAngle = get_rotation_angle(testArray)
+        
+        #convert to degrees
+        rotationAngleDegrees = rotationAngle*360/(2*math.pi)
+        print rotationAngleDegrees
+        
+    #flag5 = test for get_min_distance()
+    if(flag5 == True):
+        lineEnds1 = [[0,0],[0,15]]
+        lineEnds2 = [[5,0],[6,15]]
+        minDistance = get_min_distance(lineEnds1,lineEnds2)
+        print minDistance
+        
