@@ -1,0 +1,124 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 17 18:26:21 2017
+
+@author: vanessaebogan
+"""
+
+import numpy as np
+import scipy
+import matplotlib.pyplot as plt
+from numpy import loadtxt
+from scipy.integrate import ode
+from ylpsolver_fitting import odesolver
+
+
+def workfile(params):
+    #takes in initial bond number and optimizes through objective function as 
+    #defined by N. Alvarez et. al
+    bond=params
+    # print outputs of each section
+    model=odesolver(bond)
+    
+    xm=model[:,1]
+    zm=model[:,2]
+    xm_2=np.append(list(reversed(-xm)),xm[1:])
+    zm_2=np.append(list(reversed(zm)),zm[1:])
+     
+    xmod=xm_2[:-1]
+    zmod=zm_2[:-1]
+    xmod_plus=xm_2[1:]
+    zmod_plus=zm_2[1:]
+    
+    xdata=np.tile(xdatavec,(len(xmod),1))
+    zdata=np.tile(zdatavec,(len(zmod),1))
+    
+    xmodel=np.tile(xmod,(len(xdatavec),1)).transpose()
+    zmodel=np.tile(zmod,(len(zdatavec),1)).transpose()
+    xmodel_plus=np.tile(xmod_plus,(len(xdatavec),1)).transpose()
+    zmodel_plus=np.tile(zmod_plus,(len(zdatavec),1)).transpose()
+    
+    a=(zmodel-zdata)*(xmodel-xmodel_plus)
+    b=(xmodel-xdata)*(zmodel-zmodel_plus)
+    c=np.power((xmodel-xmodel_plus),2)
+    d=np.power((zmodel-zmodel_plus),2)
+    
+    output=np.power(((a+b)/np.power((c+d),0.5)),2)
+    
+    rsq=np.min(output,axis=0)
+    
+    return np.sum(rsq)
+
+def workfile2(params):
+    #takes in initial radius of curvature (and optimized Bond number) 
+    # and optimizes through objective function as defined by N. Alvarez et. al
+    global Bond_final
+    r0=params
+    # print outputs of each section
+    model=odesolver(Bond_final)
+    
+    xm=model[:,1]*r0
+    zm=model[:,2]*r0
+    xm_2=np.append(list(reversed(-xm)),xm[1:])
+    zm_2=np.append(list(reversed(zm)),zm[1:])
+     
+    xmod=xm_2[:-1]
+    zmod=zm_2[:-1]
+    xmod_plus=xm_2[1:]
+    zmod_plus=zm_2[1:]
+    
+    xdata=np.tile(xdatavec,(len(xmod),1))
+    zdata=np.tile(zdatavec,(len(zmod),1))
+    
+    xmodel=np.tile(xmod,(len(xdatavec),1)).transpose()
+    zmodel=np.tile(zmod,(len(zdatavec),1)).transpose()
+    xmodel_plus=np.tile(xmod_plus,(len(xdatavec),1)).transpose()
+    zmodel_plus=np.tile(zmod_plus,(len(zdatavec),1)).transpose()
+    
+    a=(zmodel-zdata)*(xmodel-xmodel_plus)
+    b=(xmodel-xdata)*(zmodel-zmodel_plus)
+    c=np.power((xmodel-xmodel_plus),2)
+    d=np.power((zmodel-zmodel_plus),2)
+    
+    output=np.power(((a+b)/np.power((c+d),0.5)),2)
+    
+    rsq=np.min(output,axis=0)
+    
+    print(np.sum(rsq))
+    return np.sum(rsq)
+
+    
+if __name__ == "__main__":
+    
+    Bond_actual=1  
+    r0_actual=.03
+    
+    xdata=odesolver(Bond_actual)[:,1]*r0_actual
+    zdata=odesolver(Bond_actual)[:,2]*r0_actual
+    
+    xdatavec=np.append(list(reversed(-xdata)),xdata[1:])
+    zdatavec=np.append(list(reversed(zdata)),zdata[1:])
+    
+    Bond_guess=3
+    r0_guess=.1
+    
+    r=scipy.optimize.minimize(workfile,Bond_guess,method='Nelder-Mead')
+    global Bond_final
+    Bond_final=r.x
+    print(Bond_final)
+     
+    r2=scipy.optimize.minimize(workfile2,r0_guess,method='Nelder-Mead')
+    r0_final=r2.x
+    print(r0_final)
+    
+    model=odesolver(Bond_final)
+    
+    xm=model[:,1]*r0_final
+    zm=model[:,2]*r0_final
+    xm_2=np.append(list(reversed(-xm)),xm[1:])
+    zm_2=np.append(list(reversed(zm)),zm[1:])
+    
+    
+    plt.plot(xdatavec,zdatavec,'r')
+    plt.plot(xm_2,zm_2,'b')
