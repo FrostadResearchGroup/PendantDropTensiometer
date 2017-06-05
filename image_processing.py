@@ -100,12 +100,11 @@ def calculate_dot_product(vectEndX, vectEndY, pointCoordX, pointCoordY):
     else:
         return False
         
-def isolate_drop(lineBuilder, interfaceCoords):
+def isolate_drop(lineCoordX, lineCoordY, interfaceCoords):
     #checks whether point is above or below line using the calculate_cross_product function above
     #if line_position is above (True), keep looping, else is below (False) therefore stop looping
     linePosition = True
-    lineCoordX = lineBuilder.xs
-    lineCoordY = lineBuilder.ys
+    cutoffPoint = None    
     
     #loop to find the outline coordinate where the outline coordinate is below the line
     for i in range (0, len(interfaceCoords)):
@@ -157,8 +156,9 @@ def scale_drop(translatedDropCoords, magnificationRatio):
         scaledDropCoordsY.append(floatY)
         
     for j in range(0,len(scaledDropCoordsX)):
-        scaledDropCoords[j] = [scaledDropCoordsX[j], scaledDropCoordsY[j]]
+        scaledDropCoords.append([scaledDropCoordsX[j], scaledDropCoordsY[j]])
         
+    scaledDropCoords = np.array(scaledDropCoords)
     return scaledDropCoords
     
 #For Testing Purposes    
@@ -171,14 +171,13 @@ if __name__ == "__main__":
     flag2 = False
     flag3 = False
     flag4 = False
-    flag5 = True
+    flag5 = False
     flag6 = False
     flag7 = False
-    flag8 = False
-    flag9 = False
-    flag10 = False
+    flag8 = True
+    flag9 = True
+    flag10 = True
     
-    #test codes
     #flag1 = test for binarize_image()
     if (flag1 == True):
         img = mpimg.imread('H2O in PDMS.jpg')
@@ -205,7 +204,7 @@ if __name__ == "__main__":
     if(flag4 == True):
         #set up test array
         testArray = []
-        for i in range(0,39):
+        for i in range(0,59):
             testArray.append([i,i+0.5*i])
         print testArray
         
@@ -217,8 +216,57 @@ if __name__ == "__main__":
         
     #flag5 = test for get_min_distance()
     if(flag5 == True):
-        lineEnds1 = [[0,0],[0,15]]
-        lineEnds2 = [[5,0],[6,15]]
+        lineEnds1 = [[5,1],[14,1]]
+        lineEnds2 = [[5,6],[15,6]]
         minDistance = get_min_distance(lineEnds1,lineEnds2)
         print minDistance
         
+    #flag6: test for get_magnification_ratio()
+    if(flag6 == True):
+        #set up test array
+        testArray = []
+        for i in range(0,59):
+            testArray.append([0,i])
+            testArray.append([20,i])
+        print testArray
+        
+        testActualDiameter = 1.63
+        magRatio = get_magnification_ratio(testArray,testActualDiameter)
+        print magRatio
+     
+    #flag7: test for calculate_dot_product()
+    if(flag7 == True):
+        #define test variables
+        testVectEndX = [0,5]
+        testVectEndY = [10,6]
+        testPointCoordX = 5
+        testPointCoordY = 2 #change value to test
+        
+        testBool = calculate_dot_product(testVectEndX, testVectEndY, testPointCoordX, testPointCoordY)
+        print testBool
+   
+    # NOTE: flags 8, 9 ,10 work together, therefore to test 10, 8 and 9 has to be set to True as well
+    #flag8: test for isolate_drop     
+    if(flag8 == True):
+        testLineX = [200, 1000]
+        testLineY = [400,400]
+        img = mpimg.imread('H2O in PDMS.jpg')
+        binarizedImage = binarize_image(img)
+        edges = detect_boundary(binarizedImage)
+        interfaceCoordinates = get_interface_coordinates(edges)
+        
+        testDropCoords = isolate_drop(testLineX,testLineY,interfaceCoordinates)
+        plt.scatter(testDropCoords[:,0],testDropCoords[:,1])
+     
+    #flag9: test for translate_drop
+    if(flag9 == True):
+        translatedDropCoords = translate_drop(testDropCoords)
+        plt.clf()
+        plt.scatter(translatedDropCoords[:,0],translatedDropCoords[:,1])
+        
+    #flag10: test for scale_drop
+    if(flag10 == True):
+        testMagnificationRatio = 0.02
+        scaledDropCoords = scale_drop(translatedDropCoords, testMagnificationRatio)
+        plt.clf()
+        plt.scatter(scaledDropCoords[:,0],scaledDropCoords[:,1])
