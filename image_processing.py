@@ -123,41 +123,37 @@ def isolate_drop(lineCoordX, lineCoordY, interfaceCoords):
         j += 1
 
     return dropCoords
-    
-def translate_drop(dropCoords):
-    #centers the drop   
-    translationFactorX = (dropCoords[1,0] + dropCoords[0,0])*0.5
-    for i in range(0,len(dropCoords)-1):
-        dropCoords[i,0] = dropCoords[i,0] - translationFactorX
-        
-    #flip the drop vertically
-    translationFactorY = dropCoords[0,1]
-    for j in range(0,len(dropCoords)-1):
-        dropCoords[j,1] = dropCoords[j,1] - translationFactorY
-        
-    dropMidPointY = (dropCoords[-1,1]+dropCoords[0,1])*0.5
-    
-    for k in range(0,len(dropCoords)-1):
-        dropCoords[k,1] = dropMidPointY - (dropCoords[k,1] - dropMidPointY)
-        
-    translatedDropCoords = dropCoords
-    return translatedDropCoords
 
-def shift_coords(coords,center):
+def shift_coords(coords, newCenter, oldCenter = np.array([0,0])):
     """ 
     Shift the coordinates so that the orgin is at the specified center.
     
     coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
-    center = ndarray (1,i)
+    newCenter = ndarray (1,i)
+    oldCenter (optional) = ndarray(1,i)
     """
-    #centers the drop   
-    coords -= center
+    #centers the drop
+    centerDifference = oldCenter - np.array(newCenter)
+    coords -= centerDifference
     
+    #flip the coordinates vertically
+    coords *= [1,-1]
     return coords
-
+    
+def scale_drop(coords, magnificationRatio):
+    """ 
+    Scale the coordinate based on the magnification ratio
+    
+    coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
+    magnificationRatio = float
+    """
+    scaledCoords = coords * [magnificationRatio, magnificationRatio] 
+    return scaledCoords
+    
 def rotate_coords(coords,angle,format='radians'):
     """ 
     Shift the coordinates so that the orgin is at the specified center.
+    Rotates COUNTER-CLOCKWISE respective to the angle given in the argument
     
     coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
     angle = float in radians
@@ -167,37 +163,21 @@ def rotate_coords(coords,angle,format='radians'):
     y = coords[:,1]
     if format is 'degrees':
         angle *= np.pi/180
-    xRot = x*np.cos(angle) + y*np.sin(angle)
-    yRot = x*np.cos(angle) - y*np.sin(angle)
+    xRot = x*np.cos(angle) - y*np.sin(angle)
+    yRot = x*np.sin(angle) + y*np.cos(angle)
     coords[:,0] = xRot
     coords[:,1] = yRot
-    
-    return coords
-    
-def scale_drop(translatedDropCoords, magnificationRatio):
-    #multiply the coordinates by the magnification ratio to get the true coordinates in mm
-    scaledDropCoordsX = []
-    scaledDropCoordsY = []
-    scaledDropCoords = []
-    
-    for i in range(0,len(translatedDropCoords)-1):
-        floatX = translatedDropCoords[i,0] * magnificationRatio
-        floatY = translatedDropCoords[i,1] * magnificationRatio
-        scaledDropCoordsX.append(floatX)
-        scaledDropCoordsY.append(floatY)
-        
-    for j in range(0,len(scaledDropCoordsX)):
-        scaledDropCoords.append([scaledDropCoordsX[j], scaledDropCoordsY[j]])
-        
-    scaledDropCoords = np.array(scaledDropCoords)
-    return scaledDropCoords
+    return coords    
     
 #For Testing Purposes    
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
     
-    #test flags
+    #test array for flags 9, 10 ,11
+    testArray = np.array([[-5.0,5.0],[5.0,5.0],[-5.0,-5.0],[5.0,-5.0]])
+    
+    #test flags: change to True when testing specific functions
     flag1 = False
     flag2 = False
     flag3 = False
@@ -205,9 +185,10 @@ if __name__ == "__main__":
     flag5 = False
     flag6 = False
     flag7 = False
-    flag8 = True
-    flag9 = True
-    flag10 = True
+    flag8 = False
+    flag9 = False
+    flag10 = False
+    flag11 = False
     
     #flag1 = test for binarize_image()
     if (flag1 == True):
@@ -257,8 +238,8 @@ if __name__ == "__main__":
         #set up test array
         testArray = []
         for i in range(0,59):
-            testArray.append([0,i])
-            testArray.append([20,i])
+            testArray.append([0 - (0.001*i),i])
+            testArray.append([10 + (0.001*i),i])
         print testArray
         
         testActualDiameter = 1.63
@@ -272,11 +253,9 @@ if __name__ == "__main__":
         testVectEndY = [10,6]
         testPointCoordX = 5
         testPointCoordY = 2 #change value to test
-        
         testBool = calculate_dot_product(testVectEndX, testVectEndY, testPointCoordX, testPointCoordY)
         print testBool
    
-    # NOTE: flags 8, 9 ,10 work together, therefore to test 10, 8 and 9 has to be set to True as well
     #flag8: test for isolate_drop     
     if(flag8 == True):
         testLineX = [200, 1000]
@@ -285,19 +264,27 @@ if __name__ == "__main__":
         binarizedImage = binarize_image(img)
         edges = detect_boundary(binarizedImage)
         interfaceCoordinates = get_interface_coordinates(edges)
-        
         testDropCoords = isolate_drop(testLineX,testLineY,interfaceCoordinates)
+        print testDropCoords
         plt.scatter(testDropCoords[:,0],testDropCoords[:,1])
-     
-    #flag9: test for translate_drop
+        
+    #flag9: test ofr shift_coords
     if(flag9 == True):
-        translatedDropCoords = translate_drop(testDropCoords)
-        plt.clf()
-        plt.scatter(translatedDropCoords[:,0],translatedDropCoords[:,1])
+        newCenter = [10,0]
+        shiftedCoords = shift_coords(testArray,newCenter)
+        print shiftedCoords
+        plt.scatter(shiftedCoords[:,0],shiftedCoords[:,1])
         
     #flag10: test for scale_drop
     if(flag10 == True):
-        testMagnificationRatio = 0.02
-        scaledDropCoords = scale_drop(translatedDropCoords, testMagnificationRatio)
-        plt.clf()
+        testMagnificationRatio = 10.0
+        scaledDropCoords = scale_drop(testArray, testMagnificationRatio)
+        print scaledDropCoords
         plt.scatter(scaledDropCoords[:,0],scaledDropCoords[:,1])
+        
+    #flag11: test for rotate_coords
+    if(flag11 == True):
+        angle = 90 #degrees
+        finalCoords = rotate_coords(testArray, angle, 'degrees')
+        print finalCoords
+        plt.scatter(finalCoords[:,0],finalCoords[:,1])
