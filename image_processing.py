@@ -142,6 +142,37 @@ def translate_drop(dropCoords):
         
     translatedDropCoords = dropCoords
     return translatedDropCoords
+
+def shift_coords(coords,center):
+    """ 
+    Shift the coordinates so that the orgin is at the specified center.
+    
+    coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
+    center = ndarray (1,i)
+    """
+    #centers the drop   
+    coords -= center
+    
+    return coords
+
+def rotate_coords(coords,angle,format='radians'):
+    """ 
+    Shift the coordinates so that the orgin is at the specified center.
+    
+    coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
+    angle = float in radians
+    format (optional) = string specifying radians or degrees
+    """
+    x = coords[:,0]
+    y = coords[:,1]
+    if format is 'degrees':
+        angle *= np.pi/180
+    xRot = x*np.cos(angle) + y*np.sin(angle)
+    yRot = x*np.cos(angle) - y*np.sin(angle)
+    coords[:,0] = xRot
+    coords[:,1] = yRot
+    
+    return coords
     
 def scale_drop(translatedDropCoords, magnificationRatio):
     #multiply the coordinates by the magnification ratio to get the true coordinates in mm
