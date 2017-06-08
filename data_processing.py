@@ -31,16 +31,16 @@ def young_laplace(Bo,nPoints,L):
     solver = ode(ode_system)
     solver.set_integrator('dopri5')
 
-    current_s=1
-    N=100
+    current_s=L
+    N=nPoints
 
-    bond=params
+    bond=Bo
     
     #sets bond number to value inputted when ylp_func is called by solver
     solver.set_f_params(bond)
 
     #set initial values
-    s0 = -current_s
+    s0 = -L
     y0 = [0.00001,0.00001,0.00001]
     solver.set_initial_value(y0,s0)
     
@@ -62,14 +62,14 @@ def young_laplace(Bo,nPoints,L):
         
     return sol
 
-def objective_fun(params,deltaRho,xData,zData):
+def objective_fun(params,deltaRho,xCoords,zCoords):
     gamma = params[0]
     R0 = params[1]
     #takes in initial bond number and optimizes through objective function as 
     #defined by N. Alvarez et. al
     bond= deltaRho*9.81*R0**2/gamma
     # print outputs of each section
-    model=young_laplace(bond)
+    model=young_laplace(bond,100,1)
     
     xModel=model[:,1]
     zModel=model[:,2]
@@ -81,8 +81,8 @@ def objective_fun(params,deltaRho,xData,zData):
     xModelFit_plus=xModel_App[1:]
     zModelFit_plus=zModel_App[1:]
     
-    xData*=R0
-    zData*=R0
+    xData=xCoords
+    zData=zCoords
     
     xdatagrid=np.tile(xData,(len(xModelFit),1))
     zActualgrid=np.tile(zData,(len(zModelFit),1))
@@ -97,7 +97,7 @@ def objective_fun(params,deltaRho,xData,zData):
     c=np.power((xFit-xFit_plus),2)
     d=np.power((zFit-zFit_plus),2)
     
-    output=np.power(((a+b)/np.power((c+d),0.5)),2)
+    output=np.power(((a-b)/np.power((c+d),0.5)),2)
     
     rsq=np.min(output,axis=0)
     
@@ -137,12 +137,12 @@ if __name__ == "__main__":
     
     if testYLP:
     #### Acutal Data Points 
-        Bond_actual=1  
-        r0_actual=.8
+        Bond_actual=3
+        r0_actual=.08
         deltaRho=900
         sigmaActual=deltaRho*9.81*r0_actual**2/Bond_actual
         
-        temp = young_laplace(Bond_actual)
+        temp = young_laplace(Bond_actual,100,1)
         xActual = temp[:,1]
         zActual = temp[:,2]
         
@@ -150,26 +150,31 @@ if __name__ == "__main__":
         zActual_App=np.append(list(reversed(zActual)),zActual[1:])
         ################################################################  
         
-#        sigmaGuess=5
-#        R0Guess=.1
-#        
-#        initGuess=[sigmaGuess,R0Guess]
-#        
-#        r=optimize.minimize(objective_fun,initGuess,args=(deltaRho,xActual_App,
-#                                  zActual_App),method='Nelder-Mead')
-#        
-#        sigmaFinal=r.x[0]
-#        R0Final=r.x[1]
-#        Bond_final=deltaRho*9.81*r.x[1]**2/r.x[0]
-#        
-#        fitted=young_laplace(Bond_final)
-#        
-#        xCurveFit=fitted[:,1]*R0Final
-#        zCurveFit=fitted[:,2]*R0Final
-#        xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
-#        zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])
+        sigmaGuess=50
+        R0Guess=.12
+        
+        initGuess=[sigmaGuess,R0Guess]
+        
+        r=optimize.minimize(objective_fun,initGuess,args=(deltaRho,xActual_App,
+                                  zActual_App),method='Nelder-Mead')
+        
+        sigmaFinal=r.x[0]
+        r0Final=r.x[1]
+        Bond_final=deltaRho*9.81*r0Final**2/sigmaFinal
+        
+        fitted=young_laplace(Bond_final,100,1)
+        
+        xCurveFit=fitted[:,1]
+        zCurveFit=fitted[:,2]
+        xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
+        zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])
         
         
         plt.plot(xActual_App,zActual_App,'ro')
         plt.axis('equal')
-#        plt.plot(xCurveFit_App,zCurveFit_App,'bo')
+        plt.plot(xCurveFit_App,zCurveFit_App,'bo')
+        
+        
+        plt.plot(xActual_App,zActual_App,'ro')
+        plt.axis('equal')
+        plt.plot(xCurveFit_App,zCurveFit_App,'bo')
