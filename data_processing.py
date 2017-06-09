@@ -69,10 +69,10 @@ def objective_fun(params,deltaRho,xCoords,zCoords):
     #defined by N. Alvarez et. al
     bond= deltaRho*9.81*R0**2/gamma
     # print outputs of each section
-    model=young_laplace(bond,100,1)
+    model=young_laplace(bond,400,2)
     
-    xModel=model[:,1]
-    zModel=model[:,2]
+    xModel=model[:,1]*R0
+    zModel=model[:,2]*R0
     xModel_App=np.append(list(reversed(-xModel)),xModel[1:])
     zModel_App=np.append(list(reversed(zModel)),zModel[1:])
      
@@ -116,8 +116,10 @@ def test_obj_fun(params,x_data,y_data):
 
 if __name__ == "__main__":
     
-    testYLP = True
-    testLine = False
+    plt.close('all')
+    
+    testYLP = False
+    testLine = True
     
     if testLine:
         # Generate test data
@@ -137,44 +139,43 @@ if __name__ == "__main__":
     
     if testYLP:
     #### Acutal Data Points 
-        Bond_actual=3
-        r0_actual=.08
+        sigmaActual=0.073
+        r0_actual=.003
         deltaRho=900
-        sigmaActual=deltaRho*9.81*r0_actual**2/Bond_actual
+        Bond_actual=deltaRho*9.81*r0_actual**2/sigmaActual
         
-        temp = young_laplace(Bond_actual,100,1)
-        xActual = temp[:,1]
-        zActual = temp[:,2]
+        temp = young_laplace(Bond_actual,50,1)
+        xActual = temp[:,1]*r0_actual
+        zActual = temp[:,2]*r0_actual
         
         xActual_App=np.append(list(reversed(-xActual)),xActual[1:])
         zActual_App=np.append(list(reversed(zActual)),zActual[1:])
         ################################################################  
         
-        sigmaGuess=50
-        R0Guess=.12
+        sigmaGuess=.05
+        R0Guess=.002
         
         initGuess=[sigmaGuess,R0Guess]
         
-        r=optimize.minimize(objective_fun,initGuess,args=(deltaRho,xActual_App,
+        for i in range(3):
+            r=optimize.minimize(objective_fun,initGuess,args=(deltaRho,xActual_App,
                                   zActual_App),method='Nelder-Mead')
+            initGuess=[r.x[0],r.x[1]]
+            print(initGuess)
         
-        sigmaFinal=r.x[0]
-        r0Final=r.x[1]
-        Bond_final=deltaRho*9.81*r0Final**2/sigmaFinal
-        
-        fitted=young_laplace(Bond_final,100,1)
-        
-        xCurveFit=fitted[:,1]
-        zCurveFit=fitted[:,2]
-        xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
-        zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])
-        
-        
-        plt.plot(xActual_App,zActual_App,'ro')
-        plt.axis('equal')
-        plt.plot(xCurveFit_App,zCurveFit_App,'bo')
+            sigmaFinal=r.x[0]
+            r0Final=r.x[1]
+            Bond_final=deltaRho*9.81*r0Final**2/sigmaFinal
+            
+            fitted=young_laplace(Bond_final,50,1)
+            
+            xCurveFit=fitted[:,1]*r0Final
+            zCurveFit=fitted[:,2]*r0Final
+            xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
+            zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])
         
         
-        plt.plot(xActual_App,zActual_App,'ro')
-        plt.axis('equal')
-        plt.plot(xCurveFit_App,zCurveFit_App,'bo')
+            plt.plot(xActual_App,zActual_App,'ro')
+            plt.axis('equal')
+            plt.plot(xCurveFit_App,zCurveFit_App,'b')
+            
