@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed May 17 18:26:21 2017
-
 @author: vanessaebogan
 """
 
@@ -120,6 +119,86 @@ def line(x,m,b):
     y = m*x + b
     return y
     
+def objective_fun_v1(params,deltaRho,xData,zData):
+    """
+    Calculates the sum of residual error squared between data and fitted curve
+    with respect to z: r(z)
+    """
+    #building relationship from params to bond number
+    gamma=params[0]
+    apexRadius=params[1]
+    bond=deltaRho*9.81*apexRadius**2/gamma
+    print(bond)
+    #throwing bond number into curve/coordinate generator
+    model=young_laplace(bond,50,1)
+    
+    #scaled x and z coordinates 
+    xModel=model[:,1]*apexRadius
+    zModel=model[:,2]*apexRadius
+    print(xModel)
+    xModel=np.append(list(reversed(-xModel)),xModel[1:])
+    zModel=np.append(list(reversed(zModel)),zModel[1:])
+    print(zModel)
+    zDatagrid=np.array([zData,]*len(zModel))
+    
+    zModelgrid=np.array([zModel,]*len(zData)).transpose()
+    
+    #xDatagrid=np.array([xData,]*len(xModel_app))
+    #xModelgrid=np.array([xModel_app,]*len(xData)).transpose()
+    
+    #indexing location of closest z-value
+    index=np.argmin(abs((zModelgrid-zDatagrid)),axis=0)
+    
+    #building r squared term
+    r=xModel[index]-xData
+    #r=xModelgrid[range(len(index)),index]-xDatagrid[range(len(index)),index]
+    
+    return np.sum(r**2)
+    
+
+def objective_fun_v2(params,deltaRho,xData,zData,sData):
+    """
+    Calculates the sum of residual error squared between data and fitted curve
+    with respect to z: x(s) + z(s)
+    """
+    #building relationship from params to bond number
+    gamma=params[0]
+    apexRadius=params[1]
+    bond=deltaRho*9.81*apexRadius**2/gamma
+    
+    numberPoints=200
+    sFinal=1  
+    sCoords=np.linspace(0,2*sFinal,numberPoints)    
+    
+    #throwing bond number into curve/coordinate generator
+    model=young_laplace(bond,numberPoints,sFinal)
+    
+    #scaled s (normalized), x and z coordinates
+    xModel=model[:,1]*apexRadius
+    zModel=model[:,2]*apexRadius
+
+    #append to visualize real droplet (need to normalize), shouldn't need scaling factor
+    sModel=sCoords/sCoords[len(sCoords)-1]
+    print(sModel)
+    xModel=np.append(list(reversed(-xModel)),xModel[1:])
+    zModel=np.append(list(reversed(zModel)),zModel[1:])
+    
+    sDatagrid=np.array([sData,]*len(sModel))
+    sModelgrid=np.array([sModel,]*len(sData)).transpose()
+    
+    #xDatagrid=np.array([xData,]*len(xModel_app))
+    #xModelgrid=np.array([xModel_app,]*len(xData)).transpose()
+    
+    #indexing location of closest normalized value
+    index=np.argmin(abs((sModelgrid-sDatagrid)),axis=0)
+    
+    #building r squared term
+    rx=xModel[index]-xData
+    rz=zModel[index]-zData
+    #r=xModelgrid[range(len(index)),index]-xDatagrid[range(len(index)),index]
+    
+    return np.sum((rx**2+rz**2)**0.5)
+    
 def test_fit(params,x_data,y_data):
     """
     Calculates the sum of the residual error of f(x) data, fits to slope and
@@ -137,7 +216,8 @@ if __name__ == "__main__":
     
     testYLP = False
     testLine = False
-    testObjFun = True
+    testObjFunV1 = False
+    testObjFunV2 = True
     
     if testLine:
         # Generate test data
@@ -192,62 +272,98 @@ if __name__ == "__main__":
             zCurveFit=fitted[:,2]*r0Final
             xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])
-        
-        
-            plt.plot(xActual_App,zActual_App,'ro')
-            plt.axis('equal')
-            plt.plot(xCurveFit_App,zCurveFit_App,'b')
-            
-    if testObjFun:
-        sigmaActual=0.08
+
+    if testObjFunV1:       
+         
+      #### Acutal Data Points 
+        sigmaActual=0.05
         r0_actual=.005
         deltaRho=900
         Bond_actual=deltaRho*9.81*r0_actual**2/sigmaActual
         
-        temp = young_laplace(Bond_actual,50,1)
+        temp = young_laplace(Bond_actual,10,1)
         xActual = temp[:,1]*r0_actual
         zActual = temp[:,2]*r0_actual
         
-        xData=np.append(list(reversed(-xActual)),xActual[1:])
-        zData=np.append(list(reversed(zActual)),zActual[1:])
+        xActual_App=np.append(list(reversed(-xActual)),xActual[1:])
+        zActual_App=np.append(list(reversed(zActual)),zActual[1:])
   
         ###########
-        sigmaGuess=2*sigmaActual
-        R0Guess=1.25*r0_actual
+        sigmaGuess=.75*sigmaActual
+        R0Guess=.75*r0_actual
     
         initGuess=[sigmaGuess,R0Guess]
         
-        gamma = initGuess[0]
-        r0 = initGuess[1]
-        #takes in initial bond number and optimizes through objective function as 
-        #defined by N. Alvarez et. al
-        bond= deltaRho*9.81*r0**2/gamma
-        # print outputs of each section
-        model=young_laplace(bond,400,1)
+        for i in range(2):
+            r=optimize.minimize(objective_fun_v1,initGuess,args=(deltaRho,xActual_App,
+                                  zActual_App),method='Nelder-Mead')
+            initGuess=[r.x[0],r.x[1]]
+            print(initGuess)
         
-        xModel=model[:,1]*r0
-        zModel=model[:,2]*r0
-        xModel_App=np.append(list(reversed(-xModel)),xModel[1:])
-        zModel_App=np.append(list(reversed(zModel)),zModel[1:])
+            sigmaFinal=r.x[0]
+            r0Final=r.x[1]
+            Bond_final=deltaRho*9.81*r0Final**2/sigmaFinal
+            
+            fitted=young_laplace(Bond_final,50,1)
+            
+            xCurveFit=fitted[:,1]*r0Final
+            zCurveFit=fitted[:,2]*r0Final
+            xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
+            zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
          
-        xModelFit=xModel_App[:-1]
-        zModelFit=zModel_App[:-1]
-        xModelFit_plus=xModel_App[1:]
-        zModelFit_plus=zModel_App[1:]
         
-        xActualgrid=np.array([xData,]*len(xModelFit))
-        zActualgrid=np.array([zData,]*len(zModelFit))
+            #plt.plot(xActual_App,zActual_App,'ro')
+            plt.axis('equal')
+            plt.plot(xCurveFit_App,zCurveFit_App,'b')
+            
+    if testObjFunV2:       
+         
+      #### Acutal Data Points 
+        sigmaActual=0.05
+        r0_actual=.005
+        deltaRho=900
+        Bond_actual=deltaRho*9.81*r0_actual**2/sigmaActual
         
-        xFit=np.array([xModelFit,]*len(xData)).transpose()
-        zFit=np.array([zModelFit,]*len(zData)).transpose()
-        xFit_plus=np.array([xModelFit_plus,]*len(xData)).transpose()
-        zFit_plus=np.array([zModelFit_plus,]*len(zData)).transpose()
+        L=1        
+        nPoints=150        
         
-        a=(zFit-zActualgrid)*(xFit-xFit_plus)
-        b=(xFit-xActualgrid)*(zFit-zFit_plus)
-        c=np.power((xFit-xFit_plus),2)
-        d=np.power((zFit-zFit_plus),2)
+        temp = young_laplace(Bond_actual,nPoints,L)
+        sActual = np.linspace(0,2*L,2*nPoints-1)*r0_actual
+        xActual = temp[:,1]*r0_actual
+        zActual = temp[:,2]*r0_actual
+
+        #normalized
+        sActual_App=sActual/sActual[len(sActual)-1]
+        #sActual_App=np.append(sActual/(2*sActual[len(sActual)]),
+                     #(sActual[1:]+sActual[len(sActual)])/(2*sActual[len(sActual)]))
+        xActual_App=np.append(list(reversed(-xActual)),xActual[1:])
+        zActual_App=np.append(list(reversed(zActual)),zActual[1:])
         
-        output=np.power(((a-b)/np.power((c+d),0.5)),2)
+  
+        ###########
+        sigmaGuess=sigmaActual
+        R0Guess=r0_actual
+    
+        initGuess=[sigmaGuess,R0Guess]
         
-        rsq=np.min(output,axis=0)
+        for i in range(5):
+            r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,xActual_App,
+                                  zActual_App,sActual_App),method='Nelder-Mead')
+            initGuess=[r.x[0],r.x[1]]
+            print(initGuess)
+        
+            sigmaFinal=r.x[0]
+            r0Final=r.x[1]
+            Bond_final=deltaRho*9.81*r0Final**2/sigmaFinal
+            
+            fitted=young_laplace(Bond_final,50,1)
+            
+            xCurveFit=fitted[:,1]*r0Final
+            zCurveFit=fitted[:,2]*r0Final
+            xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
+            zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
+         
+        
+            plt.plot(xActual_App,zActual_App,'ro')
+            plt.axis('equal')
+            plt.plot(xCurveFit_App,zCurveFit_App,'b')   
