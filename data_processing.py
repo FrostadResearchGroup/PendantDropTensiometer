@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 def ode_system(t,y,bond):
     """
     Outputs system of ordinary differential equations with non-dimensionalized
-    coordinates. 
-    f=[d(fi)/ds , d(X)/ds , d(Z)/ds]
+    coordinates --> f = [d(fi)/ds , d(X)/ds , d(Z)/ds]
+    t = fl
     """
     phi, r, z = y
     f = [2-bond*(z)-np.sin(phi)/(r), np.cos(phi), np.sin(phi)]
@@ -119,47 +119,10 @@ def line(x,m,b):
     y = m*x + b
     return y
     
-def objective_fun_v1(params,deltaRho,xData,zData):
+def objective_fun_v1(params,deltaRho,xData,zData,sData):
     """
     Calculates the sum of residual error squared between data and fitted curve
-    with respect to z: r(z)
-    """
-    #building relationship from params to bond number
-    gamma=params[0]
-    apexRadius=params[1]
-    bond=deltaRho*9.81*apexRadius**2/gamma
-    print(bond)
-    #throwing bond number into curve/coordinate generator
-    model=young_laplace(bond,50,1)
-    
-    #scaled x and z coordinates 
-    xModel=model[:,1]*apexRadius
-    zModel=model[:,2]*apexRadius
-    print(xModel)
-    xModel=np.append(list(reversed(-xModel)),xModel[1:])
-    zModel=np.append(list(reversed(zModel)),zModel[1:])
-    print(zModel)
-    zDatagrid=np.array([zData,]*len(zModel))
-    
-    zModelgrid=np.array([zModel,]*len(zData)).transpose()
-    
-    #xDatagrid=np.array([xData,]*len(xModel_app))
-    #xModelgrid=np.array([xModel_app,]*len(xData)).transpose()
-    
-    #indexing location of closest z-value
-    index=np.argmin(abs((zModelgrid-zDatagrid)),axis=0)
-    
-    #building r squared term
-    r=xModel[index]-xData
-    #r=xModelgrid[range(len(index)),index]-xDatagrid[range(len(index)),index]
-    
-    return np.sum(r**2)
-    
-
-def objective_fun_v2(params,deltaRho,xData,zData,sData):
-    """
-    Calculates the sum of residual error squared between data and fitted curve
-    with respect to z: x(s) + z(s)
+    with respect to z: x(s) + z(s) leveraging normalized arc length
     """
     #building relationship from params to bond number
     gamma=params[0]
@@ -168,7 +131,7 @@ def objective_fun_v2(params,deltaRho,xData,zData,sData):
     
     numberPoints=200
     sFinal=1  
-    sCoords=np.linspace(0,2*sFinal,numberPoints)    
+    sCoords=np.linspace(0,2*sFinal,2*numberPoints-1) 
     
     #throwing bond number into curve/coordinate generator
     model=young_laplace(bond,numberPoints,sFinal)
@@ -179,24 +142,19 @@ def objective_fun_v2(params,deltaRho,xData,zData,sData):
 
     #append to visualize real droplet (need to normalize), shouldn't need scaling factor
     sModel=sCoords/sCoords[len(sCoords)-1]
-    print(sModel)
     xModel=np.append(list(reversed(-xModel)),xModel[1:])
     zModel=np.append(list(reversed(zModel)),zModel[1:])
     
     sDatagrid=np.array([sData,]*len(sModel))
     sModelgrid=np.array([sModel,]*len(sData)).transpose()
-    
-    #xDatagrid=np.array([xData,]*len(xModel_app))
-    #xModelgrid=np.array([xModel_app,]*len(xData)).transpose()
-    
+       
     #indexing location of closest normalized value
     index=np.argmin(abs((sModelgrid-sDatagrid)),axis=0)
-    
     #building r squared term
     rx=xModel[index]-xData
     rz=zModel[index]-zData
-    #r=xModelgrid[range(len(index)),index]-xDatagrid[range(len(index)),index]
-    
+
+    #returning square root of residual sum of squares
     return np.sum((rx**2+rz**2)**0.5)
     
 def test_fit(params,x_data,y_data):
@@ -216,8 +174,7 @@ if __name__ == "__main__":
     
     testYLP = False
     testLine = False
-    testObjFunV1 = False
-    testObjFunV2 = True
+    testObjFunV1 = True
     
     if testLine:
         # Generate test data
@@ -273,62 +230,20 @@ if __name__ == "__main__":
             xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])
 
+
     if testObjFunV1:       
          
       #### Acutal Data Points 
         sigmaActual=0.05
         r0_actual=.005
         deltaRho=900
-        Bond_actual=deltaRho*9.81*r0_actual**2/sigmaActual
-        
-        temp = young_laplace(Bond_actual,10,1)
-        xActual = temp[:,1]*r0_actual
-        zActual = temp[:,2]*r0_actual
-        
-        xActual_App=np.append(list(reversed(-xActual)),xActual[1:])
-        zActual_App=np.append(list(reversed(zActual)),zActual[1:])
-  
-        ###########
-        sigmaGuess=.75*sigmaActual
-        R0Guess=.75*r0_actual
-    
-        initGuess=[sigmaGuess,R0Guess]
-        
-        for i in range(2):
-            r=optimize.minimize(objective_fun_v1,initGuess,args=(deltaRho,xActual_App,
-                                  zActual_App),method='Nelder-Mead')
-            initGuess=[r.x[0],r.x[1]]
-            print(initGuess)
-        
-            sigmaFinal=r.x[0]
-            r0Final=r.x[1]
-            Bond_final=deltaRho*9.81*r0Final**2/sigmaFinal
-            
-            fitted=young_laplace(Bond_final,50,1)
-            
-            xCurveFit=fitted[:,1]*r0Final
-            zCurveFit=fitted[:,2]*r0Final
-            xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
-            zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
-         
-        
-            #plt.plot(xActual_App,zActual_App,'ro')
-            plt.axis('equal')
-            plt.plot(xCurveFit_App,zCurveFit_App,'b')
-            
-    if testObjFunV2:       
-         
-      #### Acutal Data Points 
-        sigmaActual=0.05
-        r0_actual=.005
-        deltaRho=900
-        Bond_actual=deltaRho*9.81*r0_actual**2/sigmaActual
+        Bond_actual=1
         
         L=1        
         nPoints=150        
         
         temp = young_laplace(Bond_actual,nPoints,L)
-        sActual = np.linspace(0,2*L,2*nPoints-1)*r0_actual
+        sActual = np.linspace(0,2*L,2*nPoints-1)
         xActual = temp[:,1]*r0_actual
         zActual = temp[:,2]*r0_actual
 
@@ -341,28 +256,31 @@ if __name__ == "__main__":
         
   
         ###########
-        sigmaGuess=sigmaActual
-        R0Guess=r0_actual
+        sigmaGuess=3*sigmaActual
+        R0Guess=3*r0_actual
     
         initGuess=[sigmaGuess,R0Guess]
         
-        for i in range(5):
-            r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,xActual_App,
+        for i in range(3):
+            r=optimize.minimize(objective_fun_v1,initGuess,args=(deltaRho,xActual_App,
                                   zActual_App,sActual_App),method='Nelder-Mead')
             initGuess=[r.x[0],r.x[1]]
             print(initGuess)
-        
             sigmaFinal=r.x[0]
             r0Final=r.x[1]
             Bond_final=deltaRho*9.81*r0Final**2/sigmaFinal
             
-            fitted=young_laplace(Bond_final,50,1)
+            fitted=young_laplace(Bond_final,nPoints,L)
             
             xCurveFit=fitted[:,1]*r0Final
             zCurveFit=fitted[:,2]*r0Final
             xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
          
+        
+            plt.plot(xActual_App,zActual_App,'ro')
+            plt.axis('equal')
+            plt.plot(xCurveFit_App,zCurveFit_App,'b')  
         
             plt.plot(xActual_App,zActual_App,'ro')
             plt.axis('equal')
