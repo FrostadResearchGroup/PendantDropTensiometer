@@ -154,6 +154,7 @@ if __name__ == "__main__":
     testObjFunV1 = True
     # fitting based on z coordinates
     testObjFunV2 = True
+    realDataPoints = True
     
     if testObjFunV1:       
          
@@ -244,6 +245,92 @@ if __name__ == "__main__":
 
             # plot values with fitted bond number and radius of curvature at apex            
             fitted=young_laplace(bondFinal,nPoints,L)
+            
+            xCurveFit=fitted[:,1]*r0Final
+            zCurveFit=fitted[:,2]*r0Final
+            xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
+            zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
+         
+        
+            plt.plot(xActual_App,zActual_App,'ro')
+            plt.axis('equal')
+            plt.plot(xCurveFit_App,zCurveFit_App,'b')   
+            
+    if realDataPoints:
+        # pulling the data from .txt file
+        data = loadtxt("testfile.txt",delimiter=",")
+        # data not arranged in proper order (even vs. odd rows)
+        xData = data[:,0]
+        zData = data[:,1]        
+        
+        # need to re-order coordinate arrangement to line up with s-vector
+        # seperate left and right side of droplet by even and odd rows
+        for i in range(len(data[:,0])):
+            if i == 0:
+                xDataRight = xData[i]
+                zDataRight = zData[i]
+                xDataLeft = ()
+                zDataLeft = ()
+            elif i % 2 == 0:
+                xDataRight = np.append(xDataRight,xData[i])
+                zDataRight = np.append(zDataRight,zData[i])
+            else:
+                xDataLeft = np.append(xDataLeft,xData[i])
+                zDataLeft = np.append(zDataLeft,zData[i])
+        
+        magRatio = 0.006
+        
+        # averaging the right and left side droplet coords for quicker calcs
+        index = len(xDataRight)-len(xDataLeft)
+
+        if index < 0:
+            xCoords = ((xDataRight-xDataLeft[:-index])/2)*magRatio
+            zCoords = ((zDataRight+zDataLeft[:-index])/2)*magRatio
+        elif index > 0:
+            xCoords = ((xDataRight[:-index]-xDataLeft)/2)*magRatio
+            zCoords = ((zDataRight[:-index]+zDataLeft)/2)*magRatio
+        else:
+            xCoords = ((xDataRight-xDataLeft)/2)*magRatio
+            zCoords = ((zDataRight+zDataLeft)/2)*magRatio
+
+        xActual = xCoords[::-1]
+        zActual = zCoords[::-1]
+        
+        xActual_App=np.append(list(reversed(-xActual)),xActual[1:])
+        zActual_App=np.append(list(reversed(zActual)),zActual[1:])
+        
+        # calculate the straight line distance between each point
+        Distances = (((xActual[1:]+xActual[:-1])**2+(zActual[1:]-zActual[:-1])**2)
+        **0.5)
+        
+        # creating a summated arclength vector 
+        for i in range(len(Distances)):
+            if i==0:
+                sActual = np.append(0,Distances[i])
+            else:
+                sActual = np.append(sActual,sum(Distances[:i+1]))
+                
+        # initial guesses for radius at apex and surface tension
+        r0Guess = np.max(abs(xActual))
+        deltaRho = 900
+        sigmaGuess = 0.04
+
+        initGuess=[r0Guess,sigmaGuess]        
+        
+        # calling out optimization routine with reload
+        for i in range(1):
+            r=optimize.minimize(objective_fun_v1,initGuess,args=(deltaRho,xActual,
+                                  zActual,sActual),method='Nelder-Mead')
+            initGuess=[r.x[0],r.x[1]]
+            sigmaFinal=r.x[0]
+            r0Final=r.x[1]
+            Bond_final=deltaRho*9.81*r0Final**2/sigmaFinal
+            
+            nPoints=1000
+            L = sActual[len(sActual)-1]
+
+            # plot values with fitted bond number and radius of curvature at apex            
+            fitted=young_laplace(Bond_final,nPoints,L)
             
             xCurveFit=fitted[:,1]*r0Final
             zCurveFit=fitted[:,2]*r0Final
