@@ -7,6 +7,7 @@ Created on Wed May 17 18:26:21 2017
 
 import numpy as np
 
+from numpy import loadtxt
 from scipy import optimize
 from scipy.integrate import ode
 import matplotlib.pyplot as plt
@@ -66,10 +67,13 @@ def young_laplace(Bo,nPoints,L):
         sol[k] = solver.y
         k += 1
         
-    return sol
+    r = sol[:,1]
+    z = sol[:,2]
+        
+    return s,r,z
 
 
-def objective_fun_v1(params,deltaRho,xData,zData,sData):
+def objective_fun_v1(params,deltaRho,xData,zData,sData,numberPoints=700):
     """
     Calculates the sum of residual error squared between data and fitted curve
     with respect to s: x(s) + z(s) leveraging arc length
@@ -80,21 +84,18 @@ def objective_fun_v1(params,deltaRho,xData,zData,sData):
     sData    = float - arc length of droplet
     """
     #building relationship from params to bond number
-    gamma=params[0]
-    apexRadius=params[1]
-    bond=deltaRho*9.81*apexRadius**2/gamma
-    
-    numberPoints=700
-    sFinal=L*2
-    sCoords=np.linspace(0,sFinal,numberPoints) 
+    gamma = params[0]
+    apexRadius = params[1]
+    bond = deltaRho*9.81*apexRadius**2/gamma
+    sFinal = 2*sData[-1]
     
     #throwing bond number into curve/coordinate generator
-    model=young_laplace(bond,numberPoints,sFinal)
+    sModel,xModel,zModel = young_laplace(bond,numberPoints,sFinal)
     
     #x and z coordinates with arc length
-    xModel=model[:,1]*apexRadius
-    zModel=model[:,2]*apexRadius
-    sModel=sCoords
+    xModel *= apexRadius
+    zModel *= apexRadius
+    sModel *= apexRadius
     
     #building matrices for indexing based on arclength comparison
     sDatagrid=np.array([sData,]*len(sModel))
@@ -110,7 +111,7 @@ def objective_fun_v1(params,deltaRho,xData,zData,sData):
     #returning square root of residual sum of squares
     return np.sum((rx**2+rz**2)**0.5)
 
-def objective_fun_v2(params,deltaRho,xData,zData):
+def objective_fun_v2(params,deltaRho,xData,zData,numberPoints=700,sFinal=2):
     """
     Calculates the sum of residual error squared between data and fitted curve
     with respect to z: x(z) leveraging z coordinates
@@ -124,15 +125,12 @@ def objective_fun_v2(params,deltaRho,xData,zData):
     apexRadius=params[1]
     bond=deltaRho*9.81*apexRadius**2/gamma
     
-    numberPoints=700
-    sFinal=L*2  
-    
     #throwing bond number into curve/coordinate generator
-    model=young_laplace(bond,numberPoints,sFinal)
+    sModel,xModel,zModel = young_laplace(bond,numberPoints,sFinal)
     
     #scaled s (normalized), x and z coordinates
-    xModel=model[:,1]*apexRadius
-    zModel=model[:,2]*apexRadius
+    xModel *= apexRadius
+    zModel *= apexRadius
     
     zDatagrid=np.array([zData,]*len(zModel))
     zModelgrid=np.array([zModel,]*len(zData)).transpose()
@@ -145,47 +143,106 @@ def objective_fun_v2(params,deltaRho,xData,zData):
 
     #returning square root of residual sum of squares
     return np.sum((rx**2)**0.5)
+    
+    
+def get_response_surf(p1Range,p2Range,obj_fun,xData,zData,deltaRho,N=100):
+    """
+    Plot the error surface for an objective function for a 2D optimization 
+    problem.
+    p1Range = List [minVal,maxval]
+    p2Range = List [minVal,maxval]
+    
+    """
+    
+    # Create maxtrices of parameter value pairs to test
+    p1List = np.linspace(p1Range[0],p1Range[1],N)
+    p2List = np.linspace(p2Range[0],p2Range[1],N)
+    X,Y = np.meshgrid(p1List,p2List)
+    # Initialize matrix of error values
+    Z = np.zeros_like(X)
+    
+    # Compute error for each parameter pair
+    for i in range(len(X)):
+        for j in range(len(Y)):
+            p1 = X[i,j]
+            p2 = Y[i,j]
+            Z[i,j] = obj_fun([p1,p2],deltaRho,xData,zData)
+            
+    
+    return X,Y,Z
+    
+    
+def get_test_data(sigma,r0,deltaRho,N=50,L=1):
+    
+    """
+    Generate drop profile data for testing purposes.
+    sigma = float: surface tension in N/m
+    r0 = 
+    deltaRho
+    N = int: number of data points on one side of droplet (give 2N-1 points)
+    L = float: 
+    """
+    
+    # Define Bond Number and solve Young Laplace Eqn.
+    bond = deltaRho*9.81*r0**2/sigma
+    sData,xData,zData = young_laplace(bond,N,L)
+    xData *= r0
+    zData *= r0
+    
+    xData = np.append(list(reversed(-xData)),xData[1:])
+    zData = np.append(list(reversed(zData)),zData[1:])
+    
+    return xData, zData
+    
+def get_data_apex():
+    """
+    
+    """
+    
+    return
+    
+def get_data_arc_len(xData,zData):
+    """
+    Computes the arc length of data points assuming that 
+    """
+
 
 if __name__ == "__main__":
     
     plt.close('all')
       
     # fitting based on arc length
-    testObjFunV1 = True
+    testObjFunV1 = False
     # fitting based on z coordinates
     testObjFunV2 = True
-    realDataPoints = True
+    realDataPoints = False
+    viewObjFunSurf = False
     
-    if testObjFunV1:       
-         
-        # acutal aata points 
-        sigmaActual=0.05
-        r0_actual=.005
-        deltaRho=900
-        Bond_actual=deltaRho*9.81*r0_actual**2/sigmaActual
-        
-        # range of integration and number of integration points
-        L=1        
-        nPoints=150        
-        
-        temp = young_laplace(Bond_actual,nPoints,L)
-        sActual = np.linspace(0,L,nPoints)
-        xActual = temp[:,1]*r0_actual
-        zActual = temp[:,2]*r0_actual
-
-        xActual_App=np.append(list(reversed(-xActual)),xActual[1:])
-        zActual_App=np.append(list(reversed(zActual)),zActual[1:])
+    if testObjFunV1 or testObjFunV2:
+        # Generate test data for objective functions
+        sigma = 0.05
+        r0 = .005
+        deltaRho = 900
+        L = 1
+        nPoints = 150
+        Bond_actual = deltaRho*9.81*r0**2/sigma
+        xActual,zActual = get_test_data(sigma,r0,deltaRho,N=50,L=1)
+    
+    if testObjFunV1:
         
         # initial guesses to start routine
-        sigmaGuess=3*sigmaActual
-        R0Guess=3*r0_actual
+        nReload = 3
+        sigmaGuess = 3*sigma
+        R0Guess = 3*r0
     
         initGuess=[sigmaGuess,R0Guess]
         
+        # Compute arc length of data points
+        
         # calling out optimization routine with reload
         print('First Objective Function')
-        for i in range(3):
-            r=optimize.minimize(objective_fun_v1,initGuess,args=(deltaRho,xActual,
+        for i in range(nReload):
+            r = optimize.minimize(objective_fun_v1,initGuess,args=(deltaRho,xActual,
                                   zActual,sActual),method='Nelder-Mead')
             initGuess=[r.x[0],r.x[1]]
             sigmaFinal=r.x[0]
@@ -202,39 +259,24 @@ if __name__ == "__main__":
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
          
         
-            plt.plot(xActual_App,zActual_App,'ro')
+            plt.plot(xActual,zActual,'ro')
             plt.axis('equal')
             plt.plot(xCurveFit_App,zCurveFit_App,'b')   
 
 
     if testObjFunV2:       
          
-        # acutal aata points  
-        sigmaActual=0.05
-        r0_actual=.005
-        deltaRho=900
-        Bond_actual=deltaRho*9.81*r0_actual**2/sigmaActual
-
-        # range of integration and number of integration points
-        L=1        
-        nPoints=150        
-        
-        temp = young_laplace(Bond_actual,nPoints,L)
-        xActual = temp[:,1]*r0_actual
-        zActual = temp[:,2]*r0_actual
-
-        xActual_App=np.append(list(reversed(-xActual)),xActual[1:])
-        zActual_App=np.append(list(reversed(zActual)),zActual[1:])
         
         # initial guesses to start rountine 
-        sigmaGuess=3*sigmaActual
-        R0Guess=3*r0_actual
+        nReload = 3
+        sigmaGuess=3*sigma
+        R0Guess=3*r0
     
         initGuess=[sigmaGuess,R0Guess]
  
         # calling out optimization routine with reload
         print('Second Objective Function')
-        for i in range(3):
+        for i in range(nReload):
             r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,xActual,
                                   zActual),method='Nelder-Mead')
             initGuess=[r.x[0],r.x[1]]
@@ -252,7 +294,7 @@ if __name__ == "__main__":
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
          
         
-            plt.plot(xActual_App,zActual_App,'ro')
+            plt.plot(xActual,zActual,'ro')
             plt.axis('equal')
             plt.plot(xCurveFit_App,zCurveFit_App,'b')   
             
@@ -340,4 +382,17 @@ if __name__ == "__main__":
         
             plt.plot(xActual_App,zActual_App,'ro')
             plt.axis('equal')
-            plt.plot(xCurveFit_App,zCurveFit_App,'b')   
+            plt.plot(xCurveFit_App,zCurveFit_App,'b')
+    
+    if viewObjFunSurf:
+        #Create Test Data
+        sigma=0.05
+        r0=.005
+        deltaRho=900
+        x,z = get_test_data(sigma,r0,deltaRho)
+        
+        X,Y,Z = get_response_surf([.02,.1],[.001,.01],objective_fun,x,z,
+                           deltaRho,N=10)
+                           
+        ax = Axes3D(plt.figure())
+        ax.plot_surface(X,Y,np.log10(Z),linewidth=0,antialiased=False)
