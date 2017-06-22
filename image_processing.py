@@ -52,8 +52,8 @@ def get_rotation_angle(interfaceCoords):
         
     #trig function to calculate angle (in rads) using the slopes of 2 lines
     rotationAngle = math.atan((slope-flatLineSlope)/(1+(slope*flatLineSlope)))
-    
-    return rotationAngle
+    rotationAngleDegrees = rotationAngle*360/(2*math.pi)
+    return rotationAngleDegrees
     
 def get_min_distance(line1, line2):
     #step1: cross prod the two lines to find common perp vector
@@ -175,13 +175,13 @@ if __name__ == "__main__":
     import matplotlib.image as mpimg
     
     #test array for flags 9, 10 ,11
-    testArray = np.array([[-5.0,5.0],[5.0,5.0],[-5.0,-5.0],[5.0,-5.0]])
+    testArray = np.array([[-5.0,5.0],[0.0,5.0],[5.0,5.0],[5.0,0.0],[-5.0,-5.0],[0.0,-5.0],[5.0,-5.0],[-5.0,0.0]])
     
     #test flags: change to True when testing specific functions
     flag1 = False
     flag2 = False
     flag3 = False
-    flag4 = False
+    flag4 = True
     flag5 = False
     flag6 = False
     flag7 = False
@@ -217,14 +217,11 @@ if __name__ == "__main__":
         #set up test array
         testArray = []
         for i in range(0,59):
-            testArray.append([i,i+0.5*i])
+            testArray.append([i,i+0.6*i])
         print testArray
         
         rotationAngle = get_rotation_angle(testArray)
-        
-        #convert to degrees
-        rotationAngleDegrees = rotationAngle*360/(2*math.pi)
-        print rotationAngleDegrees
+        print rotationAngle
         
     #flag5 = test for get_min_distance()
     if(flag5 == True):
@@ -270,7 +267,7 @@ if __name__ == "__main__":
         
     #flag9: test ofr shift_coords
     if(flag9 == True):
-        newCenter = [10,0]
+        newCenter = [10,2]
         shiftedCoords = shift_coords(testArray,newCenter)
         print shiftedCoords
         plt.scatter(shiftedCoords[:,0],shiftedCoords[:,1])
@@ -284,7 +281,7 @@ if __name__ == "__main__":
         
     #flag11: test for rotate_coords
     if(flag11 == True):
-        angle = 90 #degrees
+        angle = 300 #degrees0
         finalCoords = rotate_coords(testArray, angle, 'degrees')
         print finalCoords
         plt.scatter(finalCoords[:,0],finalCoords[:,1])
