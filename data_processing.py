@@ -103,14 +103,14 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
         if i==0:
             sModel = np.append(0,Distances[i])
         else:
-            sModel = np.append(sModel,sum(Distances[:i+1]))   
+            sModel = np.append(sModel,sum(Distances[:i+1]))
 
     #parsing into left and right sections of data
     xDataLeft = np.array(list(reversed(xData[:apexIndex+1])))
     zDataLeft = np.array(list(reversed(zData[:apexIndex+1])))
 
     xDataRight = xData[apexIndex:]
-    zDataRight = zData[apexIndex:] 
+    zDataRight = zData[apexIndex:]
 
     #building matrices for indexing based o arclength comparison
     sDatagridLeft=np.array([sDataLeft,]*len(sModel))
@@ -118,7 +118,7 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     
     #building matrices for indexing based on arclength comparison
     sDatagridRight=np.array([sDataRight,]*len(sModel))
-    sModelgridRight=np.array([sModel,]*len(sDataRight)).transpose()   
+    sModelgridRight=np.array([sModel,]*len(sDataRight)).transpose()
        
     #indexing location of closest value
     indexLeft=np.argmin(abs((sModelgridLeft-sDatagridLeft)),axis=0)
@@ -131,10 +131,12 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     rxRight=abs(xModel[indexRight])-abs(xDataRight)
     rzRight=abs(zModel[indexRight])-abs(zDataRight)
     
+    error = np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**1)
+    print error
     #print(np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5))
     
     #returning square root of residual sum of squares
-    return np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5)
+    return rxRight
 
 def objective_fun_v2(params,deltaRho,xData,zData,numberPoints=700,sFinal=2):
     """
@@ -311,9 +313,9 @@ if __name__ == "__main__":
         # Generate test data for objective functions
         sigma = 0.06
         r0 = .0015
-        deltaRho = 900
-        L = 4
-        nPoints = 50
+        deltaRho = 998
+        L = 3.5
+        nPoints = 300
         Bond_actual = deltaRho*9.81*r0**2/sigma
         xActual,zActual = get_test_data(sigma,r0,deltaRho,nPoints,L)
         
@@ -327,20 +329,24 @@ if __name__ == "__main__":
     if testObjFunV1:
         
         # initial guesses to start routine
-        nReload = 3
-        sigmaGuess = 3*sigma
-        R0Guess = 3*r0
+        nReload = 1
+        sigmaGuess = 0.03
+        R0Guess = 0.001
     
         initGuess=[sigmaGuess,R0Guess]
         
         # calling out optimization routine with reload
         print('First Objective Function')
         for i in range(nReload):
-            r = optimize.minimize(objective_fun_v1,initGuess,args=(deltaRho,xActual,
-                zActual,sActualLeft,sActualRight,apexIndex),method='Nelder-Mead')
+            r = optimize.minimize(objective_fun_v1,initGuess,
+                                  args=(deltaRho,xActual,
+                                        zActual,sActualLeft,sActualRight,
+                                        apexIndex),method='Nelder-Mead',
+                                        tol=1e-9)
             initGuess=[r.x[0],r.x[1]]
             sigmaFinal=r.x[0]
             r0Final=r.x[1]
+            print sigmaFinal
             bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
             
             # plot values with fitted bond number and radius of curvature at apex
@@ -352,9 +358,11 @@ if __name__ == "__main__":
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
          
         
+            plt.figure()
             plt.plot(xActual,zActual,'ro')
             plt.axis('equal')
-            plt.plot(xCurveFit_App,zCurveFit_App,'b')   
+            plt.plot(xCurveFit_App,zCurveFit_App,'b')
+            plt.pause(1)
 
             
     if testObjFunV2:       
