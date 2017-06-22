@@ -88,7 +88,7 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     gamma = params[0]
     apexRadius = params[1]
     bond = deltaRho*9.81*apexRadius**2/gamma
-    sFinal = 3*sDataLeft[-1]
+    sFinal = 1.5*L
     
     #throwing bond number into curve/coordinate generator
     xModel,zModel = young_laplace(bond,numberPoints,sFinal)
@@ -96,7 +96,14 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     #x and z coordinates with arc length
     xModel = xModel*apexRadius
     zModel = zModel*apexRadius
-    sModel = ((xModel[1:]-xModel[:-1])**2 +(zModel[1:]-zModel[:-1])**2)**0.5
+    Distances = ((xModel[1:]-xModel[:-1])**2 +(zModel[1:]-zModel[:-1])**2)**0.5
+
+    # creating a summated arclength vector 
+    for i in range(len(Distances)):
+        if i==0:
+            sModel = np.append(0,Distances[i])
+        else:
+            sModel = np.append(sModel,sum(Distances[:i+1]))   
 
     #parsing into left and right sections of data
     xDataLeft = np.array(list(reversed(xData[:apexIndex+1])))
@@ -124,7 +131,7 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     rxRight=abs(xModel[indexRight])-abs(xDataRight)
     rzRight=abs(zModel[indexRight])-abs(zDataRight)
     
-    print(np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5))
+    #print(np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5))
     
     #returning square root of residual sum of squares
     return np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5)
@@ -284,11 +291,8 @@ def get_data_arc_len(xData,zData):
  
     # return different location of apex depending on whether datapoint was
     # inserted for interpolation
-    
-    if len(xApex) > 1 & len(xApex) % 2 == 0:            
-        return sActualLeft,sActualRight,apexIndex
-    else:
-        return sActualLeft,sActualRight,apexIndex
+
+    return sActualLeft,sActualRight,apexIndex
 
 if __name__ == "__main__":
     
