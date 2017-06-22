@@ -12,9 +12,7 @@ def load_image_file(filePath):
     loads image into GUI. Returns binarized image
     """
     image = cv2.imread(filePath,0)
-    blur = cv2.GaussianBlur(image,(5,5),0)
-    ret3, binaryImage = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    return binaryImage
+    return image
     
 def load_video_file(filePath):
     """
@@ -28,8 +26,8 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     
     #test flags: change to True when testing specific functions
-    flag1 = False
-    flag2 = True
+    flag1 = True
+    flag2 = False
 
     #flag1 = test for load_image_file()
     if(flag1 == True):
