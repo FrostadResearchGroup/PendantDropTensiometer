@@ -88,16 +88,17 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     gamma = params[0]
     apexRadius = params[1]
     bond = deltaRho*9.81*apexRadius**2/gamma
-    sFinal = sDataLeft[-1]+sDataRight[-1]
+    sFinal = 3*sDataLeft[-1]
     
     #throwing bond number into curve/coordinate generator
     xModel,zModel = young_laplace(bond,numberPoints,sFinal)
     
     #x and z coordinates with arc length
-    xModel *= apexRadius
-    zModel *= apexRadius
-    sModel  = np.linspace(0,sFinal,numberPoints)*apexRadius
+    xModel = xModel*apexRadius
+    zModel = zModel*apexRadius
+    sModel  = np.linspace(0,sFinal,numberPoints)
     
+    #parsing into left and right sections of data
     xDataLeft = np.array(list(reversed(xData[:apexIndex+1])))
     zDataLeft = np.array(list(reversed(zData[:apexIndex+1])))
 
@@ -115,14 +116,15 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     #indexing location of closest value
     indexLeft=np.argmin(abs((sModelgridLeft-sDatagridLeft)),axis=0)
     indexRight=np.argmin(abs((sModelgridRight-sDatagridRight)),axis=0)
-  
+
     #building r squared term
-    rxLeft=xModel[indexLeft]-(-xDataLeft)
-    rzLeft=zModel[indexLeft]-zDataLeft
-
-    rxRight=xModel[indexRight]-xDataRight
-    rzRight=zModel[indexRight]-zDataRight
-
+    rxLeft=abs(xModel[indexLeft])-abs(xDataLeft)
+    rzLeft=abs(zModel[indexLeft])-abs(zDataLeft)
+    
+    rxRight=abs(xModel[indexRight])-abs(xDataRight)
+    rzRight=abs(zModel[indexRight])-abs(zDataRight)
+    print(np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5))
+    
     #returning square root of residual sum of squares
     return np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5)
 
@@ -144,8 +146,8 @@ def objective_fun_v2(params,deltaRho,xData,zData,numberPoints=700,sFinal=2):
     xModel,zModel = young_laplace(bond,numberPoints,sFinal)
     
     #scaled s (normalized), x and z coordinates
-    xModel *= apexRadius
-    zModel *= apexRadius
+    xModel = xModel * apexRadius
+    zModel = zModel * apexRadius
     
     zDatagrid=np.array([zData,]*len(zModel))
     zModelgrid=np.array([zModel,]*len(zData)).transpose()
@@ -253,27 +255,32 @@ def get_data_arc_len(xData,zData):
     else:
         apexIndex = int(np.average(index))
     
+    xDataLeft = np.array(list(reversed(xData[:apexIndex+1])))
+    xDataRight = xData[apexIndex:]
+    
+    zDataLeft = np.array(list(reversed(zData[:apexIndex+1])))
+    zDataRight = zData[apexIndex:]
     
     # calculate the straight line distance between each point
-    arcDistLeft = (((xData[1:apexIndex+1]+xData[:apexIndex])**2
-                     +(zData[1:apexIndex+1]-zData[:apexIndex])**2)**0.5)
-    
-    arcDistRight = (((xData[apexIndex+1:]+xData[apexIndex:-1])**2
-                     +(zData[apexIndex+1:]-zData[apexIndex:-1])**2)**0.5)
-       
+    arcDistLeft = ((xDataLeft[1:]-xDataLeft[:-1])**2
+                     +(zDataLeft[1:]-zDataLeft[:-1])**2)**0.5
+
+    arcDistRight = ((xDataRight[1:]-xDataRight[:-1])**2
+                     +(zDataRight[1:]-zDataRight[:-1])**2)**0.5
+
     # creating a summated arclength vector 
     for i in range(len(arcDistLeft)):
         if i==0:
             sActualLeft = np.append(0,arcDistLeft[i])
         else:
             sActualLeft = np.append(sActualLeft,sum(arcDistLeft[:i+1]))   
-  
+
     for j in range(len(arcDistRight)):
         if j==0:
             sActualRight = np.append(0,arcDistRight[j])
         else:
             sActualRight = np.append(sActualRight,sum(arcDistRight[:j+1]))
-    
+ 
     # return different location of apex depending on whether datapoint was
     # inserted for interpolation
     
@@ -321,8 +328,6 @@ if __name__ == "__main__":
     
         initGuess=[sigmaGuess,R0Guess]
         
-        # Compute arc length of data points
-        
         # calling out optimization routine with reload
         print('First Objective Function')
         for i in range(nReload):
@@ -346,7 +351,7 @@ if __name__ == "__main__":
             plt.axis('equal')
             plt.plot(xCurveFit_App,zCurveFit_App,'b')   
 
-
+            
     if testObjFunV2:       
          
         
@@ -457,7 +462,7 @@ if __name__ == "__main__":
         
             plt.plot(xActual_App,zActual_App,'ro')
             plt.axis('equal')
-            plt.plot(xCurveFit_App,zCurveFit_App,'b')
+            #plt.plot(xCurveFit_App,zCurveFit_App,'b')
     
     if viewObjFunSurf:
         #Create Test Data
