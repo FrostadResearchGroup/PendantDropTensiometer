@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     #flag1 = test for load_image_file()
     if(flag1 == True):
-        imagePath = "H2O in PDMS.jpg"
+        imagePath = "H2O in PDMS.jpg" #change paths accordingly
         if os.path.isfile(imagePath):
             image = load_image_file(imagePath)
             plt.imshow(image, cmap = "gray")
@@ -42,18 +42,19 @@ if __name__ == "__main__":
         
     #flag2 = test for load_video_file()
     if (flag2 == True):
-        videoPath = "SampleVideo_1280x720.mp4"
-        cap = load_video_file(videoPath)
-        ret, frame = cap.read()
-        while(ret):
+        videoPath = "SampleVideo_1280x720.mp4" #change paths accordingly
+        if os.path.isfile(videoPath):
+            cap = load_video_file(videoPath)
             ret, frame = cap.read()
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            cv2.imshow('outVideo', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-            ret, frame = cap.read()
-
-        cap.release()
-        cv2.destroyAllWindows()
-        
-        
+            while(ret):
+                ret, frame = cap.read()
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                cv2.imshow('outVideo', frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+                ret, frame = cap.read()
+                
+            cap.release()
+            cv2.destroyAllWindows()
+        else:
+            print("file doesn't exist!")
