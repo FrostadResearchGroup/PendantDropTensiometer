@@ -70,10 +70,11 @@ def young_laplace(Bo,nPoints,L):
     r = sol[:,1]
     z = sol[:,2]
         
-    return s,r,z
+    return r,z
 
 
-def objective_fun_v1(params,deltaRho,xData,zData,sData,numberPoints=700):
+def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
+                     apexIndex,numberPoints=700):
     """
     Calculates the sum of residual error squared between data and fitted curve
     with respect to s: x(s) + z(s) leveraging arc length
@@ -87,29 +88,45 @@ def objective_fun_v1(params,deltaRho,xData,zData,sData,numberPoints=700):
     gamma = params[0]
     apexRadius = params[1]
     bond = deltaRho*9.81*apexRadius**2/gamma
-    sFinal = 2*sData[-1]
+    sFinal = sDataLeft[-1]+sDataRight[-1]
     
     #throwing bond number into curve/coordinate generator
-    sModel,xModel,zModel = young_laplace(bond,numberPoints,sFinal)
+    xModel,zModel = young_laplace(bond,numberPoints,sFinal)
     
     #x and z coordinates with arc length
     xModel *= apexRadius
     zModel *= apexRadius
-    sModel *= apexRadius
+    sModel  = np.linspace(0,sFinal,numberPoints)*apexRadius
+    
+    xDataLeft = xData[:apexIndex+1]
+    zDataLeft = zData[:apexIndex+1]
+    #sDataLeft = sData[:apexIndex+1]
+
+    xDataRight = xData[apexIndex:]
+    zDataRight = zData[apexIndex:]
+    #sDataRight = sData[apexIndex:]    
+
+    #building matrices for indexing based o arclength comparison
+    sDatagridLeft=np.array([sDataLeft,]*len(sModel))
+    sModelgridLeft=np.array([sModel,]*len(sDataLeft)).transpose()
     
     #building matrices for indexing based on arclength comparison
-    sDatagrid=np.array([sData,]*len(sModel))
-    sModelgrid=np.array([sModel,]*len(sData)).transpose()
+    sDatagridRight=np.array([sDataRight,]*len(sModel))
+    sModelgridRight=np.array([sModel,]*len(sDataRight)).transpose()   
        
     #indexing location of closest value
-    index=np.argmin(abs((sModelgrid-sDatagrid)),axis=0)
-
+    indexLeft=np.argmin(abs((sModelgridLeft-sDatagridLeft)),axis=0)
+    indexRight=np.argmin(abs((sModelgridRight-sDatagridRight)),axis=0)
+  
     #building r squared term
-    rx=xModel[index]-xData
-    rz=zModel[index]-zData
+    rxLeft=xModel[indexLeft]-(-xDataLeft)
+    rzLeft=zModel[indexLeft]-zDataLeft
+
+    rxRight=xModel[indexRight]-xDataRight
+    rzRight=zModel[indexRight]-zDataRight
 
     #returning square root of residual sum of squares
-    return np.sum((rx**2+rz**2)**0.5)
+    return np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5)
 
 def objective_fun_v2(params,deltaRho,xData,zData,numberPoints=700,sFinal=2):
     """
@@ -126,7 +143,7 @@ def objective_fun_v2(params,deltaRho,xData,zData,numberPoints=700,sFinal=2):
     bond=deltaRho*9.81*apexRadius**2/gamma
     
     #throwing bond number into curve/coordinate generator
-    sModel,xModel,zModel = young_laplace(bond,numberPoints,sFinal)
+    xModel,zModel = young_laplace(bond,numberPoints,sFinal)
     
     #scaled s (normalized), x and z coordinates
     xModel *= apexRadius
@@ -185,48 +202,117 @@ def get_test_data(sigma,r0,deltaRho,N=50,L=1):
     
     # Define Bond Number and solve Young Laplace Eqn.
     bond = deltaRho*9.81*r0**2/sigma
-    sData,xData,zData = young_laplace(bond,N,L)
+    
+    xData,zData = young_laplace(bond,N,L)
     xData *= r0
     zData *= r0
     
     xData = np.append(list(reversed(-xData)),xData[1:])
     zData = np.append(list(reversed(zData)),zData[1:])
     
+    # Convert to arrays and artificially pixelate
+    xData = np.array(xData)
+    zData = np.array(zData)
+    xData = np.int64(xData*100000)/100000.0
+    zData = np.int64(zData*100000)/100000.0
+       
     return xData, zData
     
-def get_data_apex():
+def get_data_apex(xData,zData):
     """
-    
+    Determines droplet apex from x and z coordinates provided through image
+    processing
+    xData = float - x coordinates of droplet
+    zData = float - z coordinates of droplet     
     """
+    # can we simply take half the arc length of the droplet and index as apex?
+    # finding index of all the minimum z locations to identify location of apex
+    index = np.argwhere(zData == np.min(zData))
+    xApex = np.average(xData[index])
+    zApex = np.min(zData)
     
-    return
+    index = np.array([index])
+    xApex = np.array([xApex])
+    zApex = np.array([zApex])
+    
+    return xApex,zApex,index
     
 def get_data_arc_len(xData,zData):
     """
-    Computes the arc length of data points assuming that 
+    Computes the arc length of data points assuming straight line distances
+    xData = float - x coordinates of droplet
+    zData = float - z coordinates of droplet 
     """
-
+    
+    xApex,zApex,index = get_data_apex(xData,zData)
+        
+    # insert interpolated datapoint into xData and zData if necessary
+    if len(xApex) > 1 & len(xApex) % 2 == 0:
+        interpVal = round(np.average(index))           
+        xData = np.insert(xData,interpVal,xApex)
+        zData = np.insert(zData,interpVal,zApex)
+        apexIndex = interpVal-1
+    else:
+        apexIndex = int(np.average(index))
+    
+    
+    # calculate the straight line distance between each point
+    arcDistLeft = (((xData[1:apexIndex+1]+xData[:apexIndex])**2
+                     +(zData[1:apexIndex+1]-zData[:apexIndex])**2)**0.5)
+    
+    arcDistRight = (((xData[apexIndex+1:]+xData[apexIndex:-1])**2
+                     +(zData[apexIndex+1:]-zData[apexIndex:-1])**2)**0.5)
+       
+    # creating a summated arclength vector 
+    for i in range(len(arcDistLeft)):
+        if i==0:
+            sActualLeft = np.append(0,arcDistLeft[i])
+        else:
+            sActualLeft = np.append(sActualLeft,sum(arcDistLeft[:i+1]))   
+  
+    for j in range(len(arcDistRight)):
+        if j==0:
+            sActualRight = np.append(0,arcDistRight[j])
+        else:
+            sActualRight = np.append(sActualRight,sum(arcDistRight[:j+1]))
+    
+    # return different location of apex depending on whether datapoint was
+    # inserted for interpolation
+    
+    if len(xApex) > 1 & len(xApex) % 2 == 0:            
+        return sActualLeft,sActualRight,apexIndex
+    else:
+        return sActualLeft,sActualRight,apexIndex
 
 if __name__ == "__main__":
     
     plt.close('all')
       
     # fitting based on arc length
-    testObjFunV1 = False
+    testObjFunV1 = True
     # fitting based on z coordinates
-    testObjFunV2 = True
+    testObjFunV2 = False
+    # importing real data
+    testData = True
     realDataPoints = False
     viewObjFunSurf = False
     
-    if testObjFunV1 or testObjFunV2:
+    if testObjFunV1 or testObjFunV2 or testData:
         # Generate test data for objective functions
-        sigma = 0.05
-        r0 = .005
+        sigma = 0.06
+        r0 = .0015
         deltaRho = 900
-        L = 1
-        nPoints = 150
+        L = 4
+        nPoints = 50
         Bond_actual = deltaRho*9.81*r0**2/sigma
-        xActual,zActual = get_test_data(sigma,r0,deltaRho,N=50,L=1)
+        xActual,zActual = get_test_data(sigma,r0,deltaRho,nPoints,L)
+        
+        # calculate the straight line distance between each point
+        sActualLeft,sActualRight,apexIndex = get_data_arc_len(xActual,zActual) 
+        
+        plt.figure()
+        plt.plot(xActual,zActual,'x')
+        plt.axis('equal')
     
     if testObjFunV1:
         
@@ -243,7 +329,7 @@ if __name__ == "__main__":
         print('First Objective Function')
         for i in range(nReload):
             r = optimize.minimize(objective_fun_v1,initGuess,args=(deltaRho,xActual,
-                                  zActual,sActual),method='Nelder-Mead')
+                zActual,sActualLeft,sActualRight,apexIndex),method='Nelder-Mead')
             initGuess=[r.x[0],r.x[1]]
             sigmaFinal=r.x[0]
             r0Final=r.x[1]
@@ -342,16 +428,8 @@ if __name__ == "__main__":
         zActual_App=np.append(list(reversed(zActual)),zActual[1:])
         
         # calculate the straight line distance between each point
-        Distances = (((xActual[1:]+xActual[:-1])**2+(zActual[1:]-zActual[:-1])**2)
-        **0.5)
+        sActualLeft,sActualRight,apexIndex = get_data_arc_len(xActual_App,zActual_App) 
         
-        # creating a summated arclength vector 
-        for i in range(len(Distances)):
-            if i==0:
-                sActual = np.append(0,Distances[i])
-            else:
-                sActual = np.append(sActual,sum(Distances[:i+1]))
-                
         # initial guesses for radius at apex and surface tension
         r0Guess = np.max(abs(xActual))
         deltaRho = 900
