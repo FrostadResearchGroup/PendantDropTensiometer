@@ -98,13 +98,11 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     zModel *= apexRadius
     sModel  = np.linspace(0,sFinal,numberPoints)*apexRadius
     
-    xDataLeft = xData[:apexIndex+1]
-    zDataLeft = zData[:apexIndex+1]
-    #sDataLeft = sData[:apexIndex+1]
+    xDataLeft = np.array(list(reversed(xData[:apexIndex+1])))
+    zDataLeft = np.array(list(reversed(zData[:apexIndex+1])))
 
     xDataRight = xData[apexIndex:]
-    zDataRight = zData[apexIndex:]
-    #sDataRight = sData[apexIndex:]    
+    zDataRight = zData[apexIndex:] 
 
     #building matrices for indexing based o arclength comparison
     sDatagridLeft=np.array([sDataLeft,]*len(sModel))
@@ -334,13 +332,12 @@ if __name__ == "__main__":
             sigmaFinal=r.x[0]
             r0Final=r.x[1]
             bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
-            print(bondFinal)
             
             # plot values with fitted bond number and radius of curvature at apex
-            fitted=young_laplace(bondFinal,nPoints,L)
+            xFit,zFit=young_laplace(bondFinal,nPoints,L)
             
-            xCurveFit=fitted[:,1]*r0Final
-            zCurveFit=fitted[:,2]*r0Final
+            xCurveFit=xFit*r0Final
+            zCurveFit=zFit*r0Final
             xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
          
