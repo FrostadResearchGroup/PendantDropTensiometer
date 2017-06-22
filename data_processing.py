@@ -96,8 +96,8 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     #x and z coordinates with arc length
     xModel = xModel*apexRadius
     zModel = zModel*apexRadius
-    sModel  = np.linspace(0,sFinal,numberPoints)
-    
+    sModel = ((xModel[1:]-xModel[:-1])**2 +(zModel[1:]-zModel[:-1])**2)**0.5
+
     #parsing into left and right sections of data
     xDataLeft = np.array(list(reversed(xData[:apexIndex+1])))
     zDataLeft = np.array(list(reversed(zData[:apexIndex+1])))
@@ -116,13 +116,14 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     #indexing location of closest value
     indexLeft=np.argmin(abs((sModelgridLeft-sDatagridLeft)),axis=0)
     indexRight=np.argmin(abs((sModelgridRight-sDatagridRight)),axis=0)
-
+    
     #building r squared term
     rxLeft=abs(xModel[indexLeft])-abs(xDataLeft)
     rzLeft=abs(zModel[indexLeft])-abs(zDataLeft)
     
     rxRight=abs(xModel[indexRight])-abs(xDataRight)
     rzRight=abs(zModel[indexRight])-abs(zDataRight)
+    
     print(np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5))
     
     #returning square root of residual sum of squares
