@@ -18,7 +18,7 @@ def binarize_image(image):
     
 def detect_boundary(binaryImage):
     #detect the outline of the binary image
-    edges = feature.canny(binaryImage,sigma=3)
+    edges = feature.canny(binaryImage,sigma=4.5)
     return edges
     
 def get_interface_coordinates(edges):
@@ -39,7 +39,7 @@ def get_interface_coordinates(edges):
     
 def get_rotation_angle(interfaceCoords):
     #get coordinates of a few points along the capillary tube
-    lineCoords = interfaceCoords[0:31:2]
+    lineCoords = interfaceCoords[0:51:2]
     lineCoordsX = [x[0] for x in lineCoords]
     lineCoordsY = [x[1] for x in lineCoords]
         
@@ -80,8 +80,8 @@ def get_min_distance(line1, line2):
     
 def get_magnification_ratio(interfaceCoords, actualDiameter):
     #get a few of the adjacent capillary tube line coordinates
-    lineCoords = interfaceCoords[0:31:2]
-    adjLineCoords = interfaceCoords[1:31:2]
+    lineCoords = interfaceCoords[0:51:2]
+    adjLineCoords = interfaceCoords[1:51:2]
     
     #get the ends of both lines
     lineEnds1 = [lineCoords[0],lineCoords[-1]]
@@ -181,9 +181,9 @@ if __name__ == "__main__":
     flag1 = False
     flag2 = False
     flag3 = False
-    flag4 = True
+    flag4 = False
     flag5 = False
-    flag6 = False
+    flag6 = True
     flag7 = False
     flag8 = False
     flag9 = False

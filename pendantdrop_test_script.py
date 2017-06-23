@@ -36,7 +36,6 @@ if os.path.isfile(filePath):
 else:
     print("file not loaded!")
     
-    
 """
 image processing
 """
@@ -66,10 +65,11 @@ magnificationRatio = ip.get_magnification_ratio(interfaceCoordinates, actualDiam
 print ("magnification ratio is " + str(magnificationRatio))
 
 #isolate drop
-pts = plt.ginput(2)
-x = map(lambda x: x[0],pts) # map applies the function passed as 
-y = map(lambda x: x[1],pts) # first parameter to each element of pts
-dropCoords = ip.isolate_drop(x,y,interfaceCoordinates)
+pts = plt.ginput(1)
+x,y = pts[0]
+xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] # map applies the function passed as 
+yCoords = [y,y]
+dropCoords = ip.isolate_drop(xCoords,yCoords,interfaceCoordinates)
 display_scat(dropCoords)
 print ("drop isolated")
 
@@ -82,7 +82,7 @@ display_scat(shiftedCoords)
 print ("shifted apex to 0,0")
 
 #rotate drop
-rotatedCoords = ip.rotate_coords(shiftedCoords,rotationAngle,'degrees')
+rotatedCoords = ip.rotate_coords(shiftedCoords ,rotationAngle*-1,'degrees')
 display_scat(rotatedCoords)
 print("corrected angle")
 
