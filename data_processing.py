@@ -70,7 +70,7 @@ def young_laplace(Bo,nPoints,L):
     r = sol[:,1]
     z = sol[:,2]
         
-    return r,z
+    return r,z,s
 
 
 def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
@@ -88,22 +88,24 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     gamma = params[0]
     apexRadius = params[1]
     bond = deltaRho*9.81*apexRadius**2/gamma
-    sFinal = 1.5*L
+    sFinal = 4
     
     #throwing bond number into curve/coordinate generator
-    xModel,zModel = young_laplace(bond,numberPoints,sFinal)
+    xModel,zModel,sModel = young_laplace(bond,numberPoints,sFinal)
     
     #x and z coordinates with arc length
     xModel = xModel*apexRadius
     zModel = zModel*apexRadius
-    Distances = ((xModel[1:]-xModel[:-1])**2 +(zModel[1:]-zModel[:-1])**2)**0.5
-
-    # creating a summated arclength vector 
-    for i in range(len(Distances)):
-        if i==0:
-            sModel = np.append(0,Distances[i])
-        else:
-            sModel = np.append(sModel,sum(Distances[:i+1]))
+    sModel = sModel*apexRadius
+    
+#    Distances = ((xModel[1:]-xModel[:-1])**2 +(zModel[1:]-zModel[:-1])**2)**0.5
+#
+#    # creating a summated arclength vector 
+#    for i in range(len(Distances)):
+#        if i==0:
+#            sModel = np.append(0,Distances[i])
+#        else:
+#            sModel = np.append(sModel,sum(Distances[:i+1]))
 
     #parsing into left and right sections of data
     xDataLeft = np.array(list(reversed(xData[:apexIndex+1])))
@@ -136,7 +138,7 @@ def objective_fun_v1(params,deltaRho,xData,zData,sDataLeft,sDataRight,
     #print(np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5))
     
     #returning square root of residual sum of squares
-    return rxRight
+    return error
 
 def objective_fun_v2(params,deltaRho,xData,zData,numberPoints=700,sFinal=2):
     """
@@ -148,30 +150,49 @@ def objective_fun_v2(params,deltaRho,xData,zData,numberPoints=700,sFinal=2):
     zData    = float - z coordinates of droplet
     """
     #building relationship from params to bond number
-    gamma=params[0]
-    apexRadius=params[1]
-    bond=deltaRho*9.81*apexRadius**2/gamma
+    gamma = params[0]
+    apexRadius = params[1]
+    bond = deltaRho*9.81*apexRadius**2/gamma
+    sFinal = 4
     
     #throwing bond number into curve/coordinate generator
-    xModel,zModel = young_laplace(bond,numberPoints,sFinal)
+    xModel,zModel,sModel = young_laplace(bond,numberPoints,sFinal)
     
-    #scaled s (normalized), x and z coordinates
-    xModel = xModel * apexRadius
-    zModel = zModel * apexRadius
+    #x and z coordinates with arc length
+    xModel = xModel*apexRadius
+    zModel = zModel*apexRadius
+
+    #parsing into left and right sections of data
+    xDataLeft = np.array(list(reversed(xData[:apexIndex+1])))
+    zDataLeft = np.array(list(reversed(zData[:apexIndex+1])))
+
+    xDataRight = xData[apexIndex:]
+    zDataRight = zData[apexIndex:]
+
+    #building matrices for indexing based o arclength comparison
+    zDatagridLeft=np.array([zDataLeft,]*len(zModel))
+    zModelgridLeft=np.array([zModel,]*len(zDataLeft)).transpose()
     
-    zDatagrid=np.array([zData,]*len(zModel))
-    zModelgrid=np.array([zModel,]*len(zData)).transpose()
+    #building matrices for indexing based on arclength comparison
+    zDatagridRight=np.array([zDataRight,]*len(zModel))
+    zModelgridRight=np.array([zModel,]*len(zDataRight)).transpose()
        
-    #indexing location of closest normalized value
-    index=np.argmin(abs((zModelgrid-zDatagrid)),axis=0)
-
+    #indexing location of closest value
+    indexLeft=np.argmin((abs(zModelgridLeft-zDatagridLeft)),axis=0)
+    indexRight=np.argmin((abs(zModelgridRight-zDatagridRight)),axis=0)
+    
     #building r squared term
-    rx=xModel[index]-xData
-
+    rxLeft=abs(xModel[indexLeft])-abs(xDataLeft)
+    rxRight=abs(xModel[indexRight])-abs(xDataRight)
+    
+    rsq=np.sum(rxLeft**2+rxRight**2)
+    
+    print rsq
+    #print(np.sum(((rxLeft**2+rzLeft**2)+(rxRight**2+rzRight**2))**0.5))
+    
     #returning square root of residual sum of squares
-    return np.sum((rx**2)**0.5)
-    
-    
+    return rsq
+
 def get_response_surf(p1Range,p2Range,obj_fun,xData,zData,deltaRho,N=100):
     """
     Plot the error surface for an objective function for a 2D optimization 
@@ -213,7 +234,7 @@ def get_test_data(sigma,r0,deltaRho,N=50,L=1):
     # Define Bond Number and solve Young Laplace Eqn.
     bond = deltaRho*9.81*r0**2/sigma
     
-    xData,zData = young_laplace(bond,N,L)
+    xData,zData,sData = young_laplace(bond,N,L)
     xData *= r0
     zData *= r0
     
@@ -226,7 +247,7 @@ def get_test_data(sigma,r0,deltaRho,N=50,L=1):
     xData = np.int64(xData*100000)/100000.0
     zData = np.int64(zData*100000)/100000.0
        
-    return xData, zData
+    return xData, zData, sData
     
 def get_data_apex(xData,zData):
     """
@@ -301,9 +322,9 @@ if __name__ == "__main__":
     plt.close('all')
       
     # fitting based on arc length
-    testObjFunV1 = True
+    testObjFunV1 = False
     # fitting based on z coordinates
-    testObjFunV2 = False
+    testObjFunV2 = True
     # importing real data
     testData = True
     realDataPoints = False
@@ -317,7 +338,7 @@ if __name__ == "__main__":
         L = 3.5
         nPoints = 300
         Bond_actual = deltaRho*9.81*r0**2/sigma
-        xActual,zActual = get_test_data(sigma,r0,deltaRho,nPoints,L)
+        xActual,zActual,sActual = get_test_data(sigma,r0,deltaRho,nPoints,L)
         
         # calculate the straight line distance between each point
         sActualLeft,sActualRight,apexIndex = get_data_arc_len(xActual,zActual) 
@@ -350,7 +371,7 @@ if __name__ == "__main__":
             bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
             
             # plot values with fitted bond number and radius of curvature at apex
-            xFit,zFit=young_laplace(bondFinal,nPoints,L)
+            xFit,zFit,sFit=young_laplace(bondFinal,nPoints,L)
             
             xCurveFit=xFit*r0Final
             zCurveFit=zFit*r0Final
@@ -379,26 +400,43 @@ if __name__ == "__main__":
         print('Second Objective Function')
         for i in range(nReload):
             r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,xActual,
-                                  zActual),method='Nelder-Mead')
+                                  zActual),method='Nelder-Mead',tol=1e-9)
             initGuess=[r.x[0],r.x[1]]
             sigmaFinal=r.x[0]
             r0Final=r.x[1]
             bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
             print(bondFinal)
 
-            # plot values with fitted bond number and radius of curvature at apex            
-            fitted=young_laplace(bondFinal,nPoints,L)
+            # plot values with fitted bond number and radius of curvature at apex
+            xFit,zFit,sFit=young_laplace(bondFinal,nPoints,L)
             
-            xCurveFit=fitted[:,1]*r0Final
-            zCurveFit=fitted[:,2]*r0Final
+            xCurveFit=xFit*r0Final
+            zCurveFit=zFit*r0Final
             xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
          
         
+            plt.figure()
             plt.plot(xActual,zActual,'ro')
             plt.axis('equal')
-            plt.plot(xCurveFit_App,zCurveFit_App,'b')   
-            
+            plt.plot(xCurveFit_App,zCurveFit_App,'b')
+            plt.pause(1)
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+##### Bottom section not used currently #####################################
+
+           
     if realDataPoints:
         # pulling the data from .txt file
         data = loadtxt("testfile.txt",delimiter=",")
