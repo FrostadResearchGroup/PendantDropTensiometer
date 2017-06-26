@@ -168,7 +168,55 @@ def rotate_coords(coords,angle,format='radians'):
     coords[:,0] = xRot
     coords[:,1] = yRot
     return coords    
+
+##### Abner's additions################################
+def reorder_data(coords):
+    """
+    Re-order data into arrays that smoothly follow the drop profile (connected)
+    """
+    xData = coords[:,0]
+    zData = coords[:,1]        
     
+    # seperate left and right side of droplet by even and odd rows
+    for i in range(len(xData)):
+        if i == 0:
+            xDataRight = ()
+            zDataRight = ()
+            xDataLeft = ()
+            zDataLeft = ()
+        elif i % 2 == 0:
+            xDataRight = np.append(xDataRight,xData[i])
+            zDataRight = np.append(zDataRight,zData[i])
+        else:
+            xDataLeft = np.append(xDataLeft,xData[i])
+            zDataLeft = np.append(zDataLeft,zData[i])
+            
+    xCoords = np.append(list(reversed(-xDataLeft)),xDataRight[1:])
+    zCoords = np.append(list(reversed(zDataLeft)),zDataRight[1:])
+
+    return xCoords,zCoords         
+        
+def delete_outliers(xCoords,zCoords):
+    """
+    Delete outlier data caused by unwanted light contrasts within droplet
+    """
+    
+    for i in range(len(xCoords)):
+        #calculate percent change compared to determined threshold
+        if i == 0:
+            xCoordsNew = xCoords[i]
+            zCoordsNew = zCoords[i]    
+        elif abs((abs(xCoords[i+1])-abs(xCoords[i]))/xCoords[i]) < .10:
+            xCoordsNew = np.append(xCoordsNew,xCoords[i+2])
+            zCoordsNew = np.append(zCoordsNew,zCoords[i+2])
+            i += 1
+        else:
+            xCoordsNew = np.append(xCoordsNew,xCoords[i])
+            zCoordsNew = np.append(zCoordsNew,zCoords[i])
+    
+    return xCoordsNew,zCoordsNew
+##### Abner's additions################################           
+
 #For Testing Purposes    
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
