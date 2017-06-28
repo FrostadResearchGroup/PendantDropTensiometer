@@ -237,7 +237,8 @@ def split_data(xActual,zActual):
 
 
 
-def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,zDataRight,numberPoints=700,sFinal=4):
+def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
+                     zDataRight,numberPoints=700,sFinal=30):
     """
     Calculates the sum of residual error squared between x data and theorectical points
     through a comparison of z coordinates.
@@ -270,11 +271,54 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,zDataRight,n
     rxRight=xModel[indexRight]-xDataRight
     
     #returning residual sum of squares
-    rsq=np.sum(rxLeft**2+rxRight**2)
+    rsq=np.sum(rxLeft**2)+np.sum(rxRight**2)
 
     return rsq
 
+def final_script(xActual,zActual,sigmaGuess,deltaRho,nReload,
+                 bondGuess=0.05,nPoints=700,L=30):
 
+    #splitting data at apex into left and right side
+    xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
+    # initial guesses to start rountine 
+    r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
+    initGuess=[sigmaGuess,r0Guess]
+
+    # calling out optimization routine with reload
+    for i in range(nReload):
+        r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,
+                            xDataLeft,zDataLeft,xDataRight,zDataRight),
+                            method='Nelder-Mead',tol=1e-9)
+        initGuess=[r.x[0],r.x[1]]
+        sigmaFinal=r.x[0]
+        r0Final=r.x[1]
+        bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
+
+        xFit,zFit=young_laplace(bondFinal,nPoints,L)
+        
+        # plot values with fitted bond number and radius of curvature at apex            
+        xCurveFit=xFit*r0Final
+        zCurveFit=zFit*r0Final
+        xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
+        zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
+     
+    
+        plt.figure()
+        plt.plot(xActual,zActual,'ro')
+        plt.axis('equal')
+        plt.plot(xCurveFit_App,zCurveFit_App,'b')
+        plt.pause(1)
+
+    return sigmaFinal,r0Final
+
+
+
+
+    
+#t1 = time.time()
+
+
+    
 if __name__ == "__main__":
     
     plt.close('all')
@@ -286,7 +330,7 @@ if __name__ == "__main__":
     # vizualization of objective function as a surface plot
     viewObjFunSurf = False
     
-    if testObjFunV1 or testObjFunV2 or testData:
+    if testObjFunV2 or testData:
         # Generate test data for objective functions
         sigma = 0.06
         r0 = .0015
@@ -342,15 +386,17 @@ if __name__ == "__main__":
      
     print "Running Time:",t1-t0,"seconds"
 
-    if viewObjFunSurf:
-        #Create Test Data
-        sigma=0.05
-        r0=.005
-        deltaRho=900
-        x,z = get_test_data(sigma,r0,deltaRho)
-        
-        X,Y,Z = get_response_surf([.02,.1],[.001,.01],objective_fun,x,z,
-                           deltaRho,N=10)
-                           
-        ax = Axes3D(plt.figure())
-        ax.plot_surface(X,Y,np.log10(Z),linewidth=0,antialiased=False)
+
+
+#    if viewObjFunSurf:
+#        #Create Test Data
+#        sigma=0.05
+#        r0=.005
+#        deltaRho=900
+#        x,z = get_test_data(sigma,r0,deltaRho)
+#        
+#        X,Y,Z = get_response_surf([.02,.1],[.001,.01],objective_fun,x,z,
+#                           deltaRho,N=10)
+#                           
+#        ax = Axes3D(plt.figure())
+#        ax.plot_surface(X,Y,np.log10(Z),linewidth=0,antialiased=False)
