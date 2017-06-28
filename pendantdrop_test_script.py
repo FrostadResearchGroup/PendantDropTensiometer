@@ -7,6 +7,7 @@ Created on Thu Jun 22 12:26:32 2017
 #import code blocks
 import image_extraction as ie
 import image_processing as ip
+import data_processing as dp
 
 #import other modules
 import tkFileDialog
@@ -90,3 +91,10 @@ print("corrected angle")
 scaledCoords = ip.scale_drop(rotatedCoords,magnificationRatio)
 display_scat(scaledCoords)
 print ("scaled coordinates according to magnification ratio")
+
+#reorder data points
+xData,zData = ip.reorder_data(scaledCoords)
+
+#throw into optimization routine
+surfTen,apexRadius = dp.final_script(xData,zData,0.03,998,1)
+
