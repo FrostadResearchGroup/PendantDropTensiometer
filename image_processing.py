@@ -18,7 +18,7 @@ def binarize_image(image):
     
 def detect_boundary(binaryImage):
     #detect the outline of the binary image
-    edges = feature.canny(binaryImage,sigma=4.5)
+    edges = feature.canny(binaryImage,sigma=3.75)
     return edges
     
 def get_interface_coordinates(edges):
@@ -53,6 +53,11 @@ def get_rotation_angle(interfaceCoords):
     #trig function to calculate angle (in rads) using the slopes of 2 lines
     rotationAngle = math.atan((slope-flatLineSlope)/(1+(slope*flatLineSlope)))
     rotationAngleDegrees = rotationAngle*360/(2*math.pi)
+    
+    #if rotational angle is being set to horizontal (quick and dirty fix)
+    if rotationAngleDegrees > 45:
+        rotationAngleDegrees = 90-rotationAngleDegrees
+
     return rotationAngleDegrees
     
 def get_min_distance(line1, line2):
@@ -80,8 +85,8 @@ def get_min_distance(line1, line2):
     
 def get_magnification_ratio(interfaceCoords, actualDiameter):
     #get a few of the adjacent capillary tube line coordinates
-    lineCoords = interfaceCoords[0:51:2]
-    adjLineCoords = interfaceCoords[1:51:2]
+    lineCoords = interfaceCoords[0:61:2]
+    adjLineCoords = interfaceCoords[1:61:2]
     
     #get the ends of both lines
     lineEnds1 = [lineCoords[0],lineCoords[-1]]
@@ -147,7 +152,9 @@ def scale_drop(coords, magnificationRatio):
     coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
     magnificationRatio = float
     """
-    scaledCoords = coords * [magnificationRatio, magnificationRatio] 
+    #changing units to meters
+    scaledCoords = coords * [magnificationRatio, 
+                             magnificationRatio] 
     return scaledCoords
     
 def rotate_coords(coords,angle,format='radians'):
@@ -169,53 +176,50 @@ def rotate_coords(coords,angle,format='radians'):
     coords[:,1] = yRot
     return coords    
 
-##### Abner's additions################################
 def reorder_data(coords):
     """
     Re-order data into arrays that smoothly follow the drop profile (connected)
     """
+    
+    coords = coords[coords[:,1].argsort()]
+    
     xData = coords[:,0]
     zData = coords[:,1]        
     
-    # seperate left and right side of droplet by even and odd rows
+    xDataRight = ()
+    zDataRight = ()
+    xDataLeft = ()
+    zDataLeft = ()
+    
+    # seperate left and right side of droplet by positive or negative x-coord value
     for i in range(len(xData)):
-        if i == 0:
-            xDataRight = ()
-            zDataRight = ()
-            xDataLeft = ()
-            zDataLeft = ()
-        elif i % 2 == 0:
+    
+        if xData[i] < 0:
+            xDataLeft = np.append(xDataLeft,xData[i])
+            zDataLeft = np.append(zDataLeft,zData[i])
+        elif xData[i] > 0:
             xDataRight = np.append(xDataRight,xData[i])
             zDataRight = np.append(zDataRight,zData[i])
         else:
             xDataLeft = np.append(xDataLeft,xData[i])
             zDataLeft = np.append(zDataLeft,zData[i])
+            xDataRight = np.append(xDataRight,xData[i])
+            zDataRight = np.append(zDataRight,zData[i])
             
-    xCoords = np.append(list(reversed(-xDataLeft)),xDataRight[1:])
-    zCoords = np.append(list(reversed(zDataLeft)),zDataRight[1:])
+    # Reorders data in descending z order
+    indexLeft = np.lexsort((xDataLeft,-zDataLeft))            
+    indexRight = np.lexsort((xDataRight,zDataRight))    
+
+    xDataLeft = xDataLeft[indexLeft]
+    xDataRight = xDataRight[indexRight]
+    zDataLeft = zDataLeft[indexLeft]
+    zDataRight = zDataRight[indexRight]
+    
+    xCoords = np.append(xDataLeft,xDataRight[1:])
+    zCoords = np.append(zDataLeft,zDataRight[1:])
 
     return xCoords,zCoords         
-        
-def delete_outliers(xCoords,zCoords):
-    """
-    Delete outlier data caused by unwanted light contrasts within droplet
-    """
-    
-    for i in range(len(xCoords)):
-        #calculate percent change compared to determined threshold
-        if i == 0:
-            xCoordsNew = xCoords[i]
-            zCoordsNew = zCoords[i]    
-        elif abs((abs(xCoords[i+1])-abs(xCoords[i]))/xCoords[i]) < .10:
-            xCoordsNew = np.append(xCoordsNew,xCoords[i+2])
-            zCoordsNew = np.append(zCoordsNew,zCoords[i+2])
-            i += 1
-        else:
-            xCoordsNew = np.append(xCoordsNew,xCoords[i])
-            zCoordsNew = np.append(zCoordsNew,zCoords[i])
-    
-    return xCoordsNew,zCoordsNew
-##### Abner's additions################################           
+               
 
 #For Testing Purposes    
 if __name__ == "__main__":
