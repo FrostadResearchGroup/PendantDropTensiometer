@@ -238,7 +238,7 @@ def split_data(xActual,zActual):
 
 
 def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
-                     zDataRight,numberPoints=700,sFinal=30):
+                     zDataRight,numberPoints=700,sFinal=100):
     """
     Calculates the sum of residual error squared between x data and theorectical points
     through a comparison of z coordinates.
@@ -275,8 +275,92 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
 
     return rsq
 
+def bond_calc(xActual,zActual):
+    """
+    Spits out an initial guess for bond Number based on droplet profile
+    """
+    #splitting data at apex into left and right side
+    xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
+
+    #looking for Xe    
+    xeLeft = max(abs(xDataLeft))
+    xeRight = max(abs(xDataRight))
+
+    #looking for Xs    
+    indicesLeft = np.argwhere(zDataLeft == 2*xeLeft)    
+    indicesRight = np.argwhere(xDataRight == 2*xeRight)
+        
+    indexLeft = round(np.average(indicesLeft))
+    indexRight = round(np.average(indicesRight))
+
+    xsLeft = zDataLeft[indexLeft]
+    xsRight = zDataRight[indexRight]
+
+    #averaging left and right values
+    sLeft = xsLeft/xeLeft
+    sRight = xsRight/xeRight
+    sAvg = (sLeft+sRight)/2        
+    
+    return sAvg
+    
+def s_interp(sAvg):
+    """
+    Searches for value to interpolate for s vs 1/H
+    """
+    #create table as listed in Bidwell et. al, 1964 
+    s = np.linspace(0.2,1.1,901)
+    hInverse = np.array([19.35325, 19.15633, 18.96089, 18.76692, 18.57443,
+                         18.38343, 18.19390, 18.00584, 17.81927, 17.63418,
+                         17.45056, 17.26842, 17.08776, 16.90858, 16.73087,
+                         16.55465, 16.37990, 16,20663, 16.03484, 15.86452,
+                         15.69569, 15.52833, 15.36245, 15.19805, 15.03513,
+                         14.87369, 14.71372, 14.55524, 14.39823, 14.24270,
+                         14.08864, 13.93607, 13.78497, 13.63535, 13.48721,
+                         13.34055, 13.19537, 13.05167, 12.90944, 12.76869,
+                         12.62942, 12.49163, 12.35531, 12.22048, 12.08712,
+                         11.95524, 11.82484, 11.69592, 11.56848, 11.44251,
+                         11.31802, 11.19501, 11.07348, 10.95343, 10.83485,
+                         10.71776, 10.60214, 10.48800, 10.37534, 10.26415,
+                         10.15445, 10.04622,  9.93947,  9.83420,  9.73041,
+                          9.62809,  9.52726,  9.42790,  9.33002,  9.23362,
+                          9.13870,  9.04525,  8.95328,  8.86280,  8.77379,
+                          8.68625,  8.60020,  8.51562,  8.43253,  8.35091,
+                          8.27077,  8.19211,  8.11492,  8.03921,  7.96499,
+                          7.89224,  8.05228,  7.98182,  7.91201,  7.84283,
+                          7.77429,  7.70640,  7.63914,  7.57252,  7.50655,
+                          7.44121,  7.37651,  7.31245,  7.24903,  7.18625,
+                          6.53790,  6.48279,  6.42833,  6.37450,  6.32132,
+                          6.26878,  6.21687,  6.16560,  6.11498,  6.06499,
+                          6.01565,  5.96694,  5.91887,  5.87144,  5.82466,
+                          5.77851,  5.73300,  5.68813,  5.64390,  5.64907,
+                          5.60579,  5.56287,  5.52033,  5.47815,  5.43635,
+                          5.39491,  5.35385,  5.31316,  5.27284,  5.23289,
+                          5.19331,  5.15410,  5.11526,  5.07679,  5.03869,
+                          5.00096,  4.96361,  4.92662,  4.89000,  4.85376,
+                          4.47952,  4.44772,  4.41629,  4.38523,  4.37119,
+                          4.34076,  4.31058,  4.28065,  4.25096,  4.22152,
+                          4.19232,  4.16337,  4.13466,  4.10620,  4.07798,
+                          4.05001,  4.02229,  3.99481,  3.96758,  3.94059,
+                          3.91358,  3.88735,  3.86110,  3.83509,  3.80933,
+                          3.78382,  3.75855,  3.73353,  3.70875,  3.68422,
+                          3.65993,  3.63589,  3.61210,  3.58855,  3.56524,
+                          3.54941,  3.52652,  3.50381,  3.48127,  3.45891,
+                          3.43672,  3.41471,  3.39288,  3.37123,  3.34975,
+                          3.32844,  3.30732,  3.28636,  3.26559,  3.24499,
+                          3.22457,  3.20432,  3.18425,  3.16436,  3.14464,
+                          3.12510,  3.10573,  3.08654,  3.06753,  3.04870,
+                          3.03003,  3.01155,  2.99691,  2.97875,  2.96073,
+                          2.94284,  2.92508,  2.90745,  2.88996,  2.87261,
+                          2.85538,  2.83829,  2.82133,  2.80451,  2.78782,
+                          2.77126,  2.75484,  2.73855,  2.72239,  2.70636,
+                          2.69047,  2.67471,  2.65909,  2.64360,  2.62824,
+                          2.61301,  2.59792,  2])
+                          
+    return bondGuess
+
+    
 def final_script(xActual,zActual,sigmaGuess,deltaRho,nReload,
-                 bondGuess=0.05,nPoints=700,L=30):
+                 bondGuess=0.2,nPoints=700,L=100):
 
     #splitting data at apex into left and right side
     xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
@@ -309,7 +393,7 @@ def final_script(xActual,zActual,sigmaGuess,deltaRho,nReload,
         plt.plot(xCurveFit_App,zCurveFit_App,'b')
         plt.pause(1)
 
-    return sigmaFinal,r0Final
+    return sigmaFinal,r0Final,bondFinal
 
 
 
