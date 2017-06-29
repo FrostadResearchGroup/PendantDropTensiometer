@@ -96,5 +96,5 @@ print ("scaled coordinates according to magnification ratio")
 xData,zData = ip.reorder_data(scaledCoords)
 
 #throw into optimization routine
-surfTen,apexRadius = dp.final_script(xData,zData,0.03,998,1)
+surfTen,apexRadius,bondNumber = dp.final_script(xData,zData,0.03,998,1)
 
