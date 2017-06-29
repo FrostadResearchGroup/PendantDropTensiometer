@@ -153,8 +153,8 @@ def scale_drop(coords, magnificationRatio):
     magnificationRatio = float
     """
     #changing units to meters
-    scaledCoords = coords * [magnificationRatio, 
-                             magnificationRatio] 
+    scaledCoords = coords * [magnificationRatio*10**-3, 
+                             magnificationRatio*10**-3] 
     return scaledCoords
     
 def rotate_coords(coords,angle,format='radians'):
