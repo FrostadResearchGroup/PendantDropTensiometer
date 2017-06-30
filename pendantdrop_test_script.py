@@ -77,8 +77,8 @@ print ("drop isolated")
 #shift coordinates so apex is at 0,0
 plt.gca().invert_yaxis()
 newCenter = [0,0]
-oldCenter = dropCoords[-1]
-shiftedCoords = ip.shift_coords(dropCoords,newCenter,oldCenter)
+
+shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
 display_scat(shiftedCoords)
 print ("shifted apex to 0,0")
 
@@ -96,5 +96,13 @@ print ("scaled coordinates according to magnification ratio")
 xData,zData = ip.reorder_data(scaledCoords)
 
 #throw into optimization routine
-surfTen,apexRadius,bondNumber = dp.final_script(xData,zData,0.03,998,1)
+sigmaInit = 0.05
+deltaRho = 998
+reloads = 1
+
+s,xe = dp.bond_calc(xData,zData)
+bondInit = dp.s_interp(s,xe)
+
+surfTen,apexRadius,bondNumber = dp.final_script(xData,zData,sigmaInit,bondInit,
+                                                deltaRho,reloads)
 
