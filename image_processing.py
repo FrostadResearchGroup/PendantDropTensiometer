@@ -9,9 +9,12 @@ from scipy import stats
 from skimage import feature
 import cv2
 import numpy as np
+import data_processing as dp
 
 def binarize_image(image):
-    #binarize image to convert the image to purely black and white image
+    """
+    binarize image to convert the image to purely black and white image
+    """
     blur = cv2.GaussianBlur(image,(5,5),0)
     ret3,binaryImage = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     return binaryImage
@@ -22,7 +25,9 @@ def detect_boundary(binaryImage):
     return edges
     
 def get_interface_coordinates(edges):
-    #go through each pixel in the edges image to extract the coordinates of the edges
+    """
+    go through each pixel in the edges image to extract the coordinates of the edges
+    """
     interfaceCoords = []
     for y in range(0,edges.shape[0]):
         edgeCoords = []
@@ -38,7 +43,9 @@ def get_interface_coordinates(edges):
     return interfaceCoords
     
 def get_rotation_angle(interfaceCoords):
-    #get coordinates of a few points along the capillary tube
+    """
+    get coordinates of a few points along the capillary tube
+    """
     lineCoords = interfaceCoords[0:51:2]
     lineCoordsX = [x[0] for x in lineCoords]
     lineCoordsY = [x[1] for x in lineCoords]
@@ -61,6 +68,9 @@ def get_rotation_angle(interfaceCoords):
     return rotationAngleDegrees
     
 def get_min_distance(line1, line2):
+    """
+    
+    """
     #step1: cross prod the two lines to find common perp vector
     (L1x1,L1y1),(L1x2,L1y2) = line1
     (L2x1,L2y1),(L2x2,L2y2) = line2
@@ -84,7 +94,9 @@ def get_min_distance(line1, line2):
     return minDistance
     
 def get_magnification_ratio(interfaceCoords, actualDiameter):
-    #get a few of the adjacent capillary tube line coordinates
+    """
+    get a few of the adjacent capillary tube line coordinates
+    """
     lineCoords = interfaceCoords[0:61:2]
     adjLineCoords = interfaceCoords[1:61:2]
     
@@ -106,8 +118,10 @@ def calculate_dot_product(vectEndX, vectEndY, pointCoordX, pointCoordY):
         return False
         
 def isolate_drop(lineCoordX, lineCoordY, interfaceCoords):
-    #checks whether point is above or below line using the calculate_cross_product function above
-    #if line_position is above (True), keep looping, else is below (False) therefore stop looping
+    """
+    checks whether point is above or below line using the calculate_cross_product function above
+    if line_position is above (True), keep looping, else is below (False) therefore stop looping
+    """
     linePosition = True
     cutoffPoint = None    
     
@@ -129,7 +143,7 @@ def isolate_drop(lineCoordX, lineCoordY, interfaceCoords):
 
     return dropCoords
 
-def shift_coords(coords, newCenter, oldCenter = np.array([0,0])):
+def shift_coords(xCoords, zCoords, newCenter):
     """ 
     Shift the coordinates so that the orgin is at the specified center.
     
@@ -137,10 +151,21 @@ def shift_coords(coords, newCenter, oldCenter = np.array([0,0])):
     newCenter = ndarray (1,i)
     oldCenter (optional) = ndarray(1,i)
     """
-    #centers the drop
-    centerDifference = oldCenter - np.array(newCenter)
-    coords -= centerDifference
     
+    #determine offset of current droplet center
+    xOffset =  (max(xCoords) + min(xCoords))/2
+    zOffset =   zCoords[-1]
+    print(zOffset)
+    oldCenter = [xOffset,zOffset]
+    
+    #centers the drop
+    xDifference = oldCenter[0] - newCenter[0]
+    zDifference = oldCenter[1] - newCenter[1]
+    xCoords -= xDifference
+    zCoords -= zDifference
+    
+    coords = np.append([xCoords],[zCoords],axis=0).transpose()
+
     #flip the coordinates vertically
     coords *= [1,-1]
     return coords
@@ -205,11 +230,13 @@ def reorder_data(coords):
             zDataLeft = np.append(zDataLeft,zData[i])
             xDataRight = np.append(xDataRight,xData[i])
             zDataRight = np.append(zDataRight,zData[i])
-            
-    # Reorders data in descending z order
-    indexLeft = np.lexsort((xDataLeft,-zDataLeft))            
-    indexRight = np.lexsort((xDataRight,zDataRight))    
 
+                       
+    # Reorders data in descending z order
+    indexLeft = np.lexsort((xDataLeft,-1*zDataLeft))
+    
+    indexRight = np.lexsort((xDataRight,zDataRight))    
+    print(indexRight)
     xDataLeft = xDataLeft[indexLeft]
     xDataRight = xDataRight[indexRight]
     zDataLeft = zDataLeft[indexLeft]
@@ -227,20 +254,57 @@ if __name__ == "__main__":
     import matplotlib.image as mpimg
     
     #test array for flags 9, 10 ,11
-    testArray = np.array([[-5.0,5.0],[0.0,5.0],[5.0,5.0],[5.0,0.0],[-5.0,-5.0],[0.0,-5.0],[5.0,-5.0],[-5.0,0.0]])
+    sigma = 0.06
+    r0 = .0015
+    deltaRho = 998
+    L = 3.5
+    nPoints = 1000
+    Bond_actual = deltaRho*9.81*r0**2/sigma
+    xActual,zActual = dp.get_test_data(sigma,r0,deltaRho,nPoints,L)
+    
+#    plt.figure()
+#    plt.plot(xActual,zActual,'x')
+#    plt.axis('equal')    
+    
+    testArray = np.append([xActual],[zActual],axis=0).transpose()    
     
     #test flags: change to True when testing specific functions
+    
+    #flag1 = test for binarize_image()
     flag1 = False
+    
+    #flag2 = test for detect_boundary()
     flag2 = False
+    
+    #flag3 = test for get_interface_coordinates()
     flag3 = False
+    
+    #flag4 = test for get_rotation_angle()
     flag4 = False
+    
+    #flag5 = test for get_min_distance()
     flag5 = False
-    flag6 = True
+    
+    #flag6: test for get_magnification_ratio()
+    flag6 = False
+    
+    #flag7: test for calculate_dot_product()
     flag7 = False
+    
+    #flag8: test for isolate_drop
     flag8 = False
-    flag9 = False
+    
+    #flag9: test ofr shift_coords
+    flag9 = True
+    
+    #flag10: test for scale_drop
     flag10 = False
+    
+    #flag11: test for rotate_coords
     flag11 = False
+    
+    #flag12: test for reordering data
+    flag12 = False
     
     #flag1 = test for binarize_image()
     if (flag1 == True):
@@ -319,8 +383,8 @@ if __name__ == "__main__":
         
     #flag9: test ofr shift_coords
     if(flag9 == True):
-        newCenter = [10,2]
-        shiftedCoords = shift_coords(testArray,newCenter)
+        newCenter = [2,2]
+        shiftedCoords = shift_coords(testArray[:,0],testArray[:,1],newCenter)
         print shiftedCoords
         plt.scatter(shiftedCoords[:,0],shiftedCoords[:,1])
         
@@ -337,3 +401,6 @@ if __name__ == "__main__":
         finalCoords = rotate_coords(testArray, angle, 'degrees')
         print finalCoords
         plt.scatter(finalCoords[:,0],finalCoords[:,1])
+        
+    if flag12:
+        xReal,zReal = reorder_data(testArray)
