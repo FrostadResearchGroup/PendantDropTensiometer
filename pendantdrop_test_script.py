@@ -18,10 +18,12 @@ import os
 def display_plot(obj):
     plt.cla()
     plt.imshow(obj, cmap='gray')
+    plt.pause(1)
     
 def display_scat(obj):
     plt.cla()
     plt.scatter(obj[:,0],obj[:,1])
+    plt.pause(1)
     
 """
 image extraction
@@ -54,10 +56,12 @@ print("boundary traced")
 interfaceCoordinates = ip.get_interface_coordinates(edges)
 plt.cla()
 plt.scatter(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
+plt.pause(1)
 print("boundary coordinates acquired")
 
 #get rotation angle
 rotationAngle = ip.get_rotation_angle(interfaceCoordinates)
+rotationAngle = 0
 print ("rotation angle against vertical axis is " + str(rotationAngle))
 
 #get magnification ratio
