@@ -264,11 +264,15 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
     #building relationship from params to bond number
     gamma = params[0]
     apexRadius = params[1]
+    theta = params[2]
     bond = deltaRho*9.81*apexRadius**2/gamma
     
     #throwing bond number into curve/coordinate generator
     xModel,zModel = young_laplace(bond,numberPoints,sFinal)
     
+    xModel = xModel*np.cos(theta) - zModel*np.sin(theta)
+    zModel = xModel*np.sin(theta) + zModel*np.cos(theta)
+
     #x and z coordinates with arc length
     xModel = xModel*apexRadius
     zModel = zModel*apexRadius
@@ -381,7 +385,7 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
         return sumArcRight
   
 def final_script(xActual,zActual,sigmaGuess,bondGuess,deltaRho,nReload,
-                 nPoints=2000):
+                 nPoints=2000,thetaGuess=0):
     
     #splitting data at apex into left and right side
     xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
@@ -391,7 +395,8 @@ def final_script(xActual,zActual,sigmaGuess,bondGuess,deltaRho,nReload,
     
     # initial guesses to start rountine 
     r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
-    initGuess=[sigmaGuess,r0Guess]
+    initGuess = [sigmaGuess,r0Guess,thetaGuess]
+
 
     intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Guess)
     
@@ -400,14 +405,17 @@ def final_script(xActual,zActual,sigmaGuess,bondGuess,deltaRho,nReload,
         r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,
                             xDataLeft,zDataLeft,xDataRight,zDataRight,intRange),
                             method='Nelder-Mead',tol=1e-9)
-        initGuess=[r.x[0],r.x[1]]
-        sigmaFinal=r.x[0]
-        r0Final=r.x[1]
+        initGuess = [r.x[0],r.x[1],r.x[2]]
+        sigmaFinal = r.x[0]
+        r0Final = r.x[1]
+        thetaFinal = r.x[2]
         bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
         
         intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
         xFit,zFit=young_laplace(bondFinal,nPoints,intRangeFinal)
         
+        xFit = xFit*np.cos(thetaFinal) - zFit*np.sin(thetaFinal)
+        zFit = xFit*np.sin(thetaFinal) + zFit*np.cos(thetaFinal)
 
         # plot values with fitted bond number and radius of curvature at apex            
         xCurveFit=xFit*r0Final
@@ -422,7 +430,7 @@ def final_script(xActual,zActual,sigmaGuess,bondGuess,deltaRho,nReload,
         plt.plot(xCurveFit_App,zCurveFit_App,'b')
         plt.pause(1)
 
-    return sigmaFinal,r0Final,bondFinal
+    return sigmaFinal,r0Final,thetaFinal,bondFinal
 
   
 t1 = time.time()
