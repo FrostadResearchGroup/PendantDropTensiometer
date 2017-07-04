@@ -102,11 +102,11 @@ xData,zData = ip.reorder_data(scaledCoords)
 #throw into optimization routine
 sigmaInit = 0.05
 deltaRho = 998
-reloads = 1
+reloads = 3
 
 s,xe = dp.bond_calc(xData,zData)
 bondInit = dp.s_interp(s,xe)
 
-surfTen,apexRadius,bondNumber = dp.final_script(xData,zData,sigmaInit,bondInit,
+surfTen,apexRadius,thetaRotation,bondNumber = dp.final_script(xData,zData,sigmaInit,bondInit,
                                                 deltaRho,reloads)
 
