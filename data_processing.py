@@ -307,8 +307,8 @@ def bond_calc(xActual,zActual):
     indicesLeft = np.argwhere(zDataLeft == 2*xeLeft)    
     indicesRight = np.argwhere(zDataRight == 2*xeRight)
         
-    indexLeft = round(np.average(indicesLeft))
-    indexRight = round(np.average(indicesRight))
+    indexLeft = int(np.average(indicesLeft))
+    indexRight = int(np.average(indicesRight))
 
     xsLeft = zDataLeft[indexLeft]
     xsRight = zDataRight[indexRight]
