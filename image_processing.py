@@ -21,7 +21,8 @@ def binarize_image(image):
     
 def detect_boundary(binaryImage):
     #detect the outline of the binary image
-    edges = feature.canny(binaryImage,sigma=3.75)
+    edges = feature.canny(binaryImage)
+    
     return edges
     
 def get_interface_coordinates(edges):
@@ -69,43 +70,33 @@ def get_rotation_angle(interfaceCoords):
     
 def get_min_distance(line1, line2):
     """
-    
+    Define straight line distance between perpindicular points on capillary
     """
-    #step1: cross prod the two lines to find common perp vector
-    (L1x1,L1y1),(L1x2,L1y2) = line1
-    (L2x1,L2y1),(L2x2,L2y2) = line2
-    L1dx,L1dy = L1x2-L1x1,L1y2-L1y1
-    L2dx,L2dy = L2x2-L2x1,L2y2-L2y1
-    commonperp_dx,commonperp_dy = (L1dy - L2dy, L2dx-L1dx)
+    line1 = np.array(line1)
+    line2 = np.array(line2)
 
-    #step2: normalized_perp = perp vector / distance of common perp
-    commonperp_length = math.hypot(commonperp_dx,commonperp_dy)
-    commonperp_normalized_dx = commonperp_dx/float(commonperp_length)
-    commonperp_normalized_dy = commonperp_dy/float(commonperp_length)
+    L1x,L1y = line1
+    L2x,L2y = line2
+    
+    dist = ((L2x-L1x)**2+(L2y-L1y)**2)**0.5
 
-    #step3: length of (pointonline1-pointonline2 dotprod normalized_perp).
-    # Note: According to the first link above, it's sufficient to
-    #    "Take any point m on line 1 and any point n on line 2."
-    #    Here I chose the startpoint of both lines
-    shortestvector_dx = (L1x1-L2x1)*commonperp_normalized_dx
-    shortestvector_dy = (L1y1-L2y1)*commonperp_normalized_dy
-    minDistance = math.hypot(shortestvector_dx,shortestvector_dy)
-
-    return minDistance
+    return dist
     
 def get_magnification_ratio(interfaceCoords, actualDiameter):
     """
-    get a few of the adjacent capillary tube line coordinates
+    determines magnification ratio through a comparison of capillary diameter
     """
-    lineCoords = interfaceCoords[0:61:2]
-    adjLineCoords = interfaceCoords[1:61:2]
     
-    #get the ends of both lines
-    lineEnds1 = [lineCoords[0],lineCoords[-1]]
-    lineEnds2 = [adjLineCoords[0],adjLineCoords[-1]]
-
+    #first points from capillary
+    if interfaceCoords[0,0]-1 <= interfaceCoords[1,0] <= interfaceCoords[0,0]+1:
+        lineCoords = interfaceCoords[0]
+        adjLineCoords = interfaceCoords[2]
+    else:
+        lineCoords = interfaceCoords[0]
+        adjLineCoords = interfaceCoords[1]
+        
     #calculate line distance and magnification ratio
-    lineDistance = get_min_distance(lineEnds1,lineEnds2)
+    lineDistance = get_min_distance(lineCoords,adjLineCoords)
     magnificationRatio = actualDiameter/lineDistance
     
     return magnificationRatio
@@ -155,7 +146,6 @@ def shift_coords(xCoords, zCoords, newCenter):
     #determine offset of current droplet center
     xOffset =  (max(xCoords) + min(xCoords))/2
     zOffset =   zCoords[-1]
-    print(zOffset)
     oldCenter = [xOffset,zOffset]
     
     #centers the drop
@@ -233,10 +223,9 @@ def reorder_data(coords):
 
                        
     # Reorders data in descending z order
-    indexLeft = np.lexsort((xDataLeft,-1*zDataLeft))
-    
+    indexLeft = np.lexsort((xDataLeft,-1*zDataLeft))    
     indexRight = np.lexsort((xDataRight,zDataRight))    
-    print(indexRight)
+
     xDataLeft = xDataLeft[indexLeft]
     xDataRight = xDataRight[indexRight]
     zDataLeft = zDataLeft[indexLeft]
@@ -274,7 +263,7 @@ if __name__ == "__main__":
     flag1 = False
     
     #flag2 = test for detect_boundary()
-    flag2 = False
+    flag2 = True
     
     #flag3 = test for get_interface_coordinates()
     flag3 = False
@@ -295,7 +284,7 @@ if __name__ == "__main__":
     flag8 = False
     
     #flag9: test ofr shift_coords
-    flag9 = True
+    flag9 = False
     
     #flag10: test for scale_drop
     flag10 = False
@@ -341,8 +330,8 @@ if __name__ == "__main__":
         
     #flag5 = test for get_min_distance()
     if(flag5 == True):
-        lineEnds1 = [[5,1],[14,1]]
-        lineEnds2 = [[5,6],[15,6]]
+        lineEnds1 = [471,1]
+        lineEnds2 = [656,1]
         minDistance = get_min_distance(lineEnds1,lineEnds2)
         print minDistance
         
@@ -351,9 +340,10 @@ if __name__ == "__main__":
         #set up test array
         testArray = []
         for i in range(0,59):
-            testArray.append([0 - (0.001*i),i])
-            testArray.append([10 + (0.001*i),i])
-        print testArray
+            testArray.append([0 - (1*i),i])
+            testArray.append([10 + (1*i),i])
+        #print testArray
+        testArray = np.array(testArray)
         
         testActualDiameter = 1.63
         magRatio = get_magnification_ratio(testArray,testActualDiameter)
