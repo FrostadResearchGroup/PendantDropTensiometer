@@ -115,8 +115,8 @@ def get_test_data(sigma,r0,deltaRho,N,L):
     bond = deltaRho*9.81*r0**2/sigma
     
     xData,zData = young_laplace(bond,N,L)
-    xData *= r0
-    zData *= r0
+    xData = xData*r0
+    zData = zData*r0
     
     xData = np.append(list(reversed(-xData)),xData[1:])
     zData = np.append(list(reversed(zData)),zData[1:])
@@ -217,21 +217,7 @@ def split_data(xActual,zActual):
     """
 
 #    #find apex of droplet and the corresponding index (or indices) and values
-#    xApex,zApex,apexIndex,indices = get_data_apex(xActual,zActual)
-#        
-#    if len(indices) % 2 == 0:
-#        #add interpolated point if there does not exist one center apex point
-#        xData,zData,newApexIndex = add_interp_point(xActual,zActual,xApex,zApex,apexIndex)
-#        #parsing into left and right sections of data
-#        xDataLeft = xData[:newApexIndex+1][::-1]
-#        zDataLeft = zData[:newApexIndex+1][::-1]
-#        xDataRight = xData[newApexIndex:]
-#        zDataRight = zData[newApexIndex:]
-#    else:
-#        xDataLeft = xActual[:apexIndex+1][::-1]
-#        zDataLeft = zActual[:apexIndex+1][::-1]
-#        xDataRight = xActual[apexIndex:]
-#        zDataRight = zActual[apexIndex:]
+
     xDataLeft = ()
     xDataRight = ()
     zDataLeft = ()
@@ -289,7 +275,7 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
     
     #returning residual sum of squares
     rsq=np.sum(rxLeft**2)+np.sum(rxRight**2)
-
+    
     return rsq
 
 def bond_calc(xActual,zActual):
@@ -308,8 +294,8 @@ def bond_calc(xActual,zActual):
     xeScal = xeAvg/r0Guess
     
     #looking for Xs    
-    indicesLeft = np.argwhere(zDataLeft == 2*xeLeft)    
-    indicesRight = np.argwhere(zDataRight == 2*xeRight)
+    indicesLeft = np.argmin(abs(zDataLeft-2*xeLeft))    
+    indicesRight = np.argmin(abs(zDataRight-2*xeRight))
         
     indexLeft = int(np.average(indicesLeft))
     indexRight = int(np.average(indicesRight))
@@ -322,7 +308,7 @@ def bond_calc(xActual,zActual):
     sRight = xsRight/xeRight
     sAvg = (sLeft+sRight)/2        
     
-    return sAvg,xeScal
+    return sAvg,xeScal,r0Guess
     
 def s_interp(sAvg,xeAvg):
     """
@@ -345,7 +331,7 @@ def s_interp(sAvg,xeAvg):
         #Use formula for S > 0.401 even though it is wrong
         hInv = (.32720/sAvg**2.56651) - (.97553*sAvg**2)+(.84059*sAvg)-(.18069);
         
-
+    print(hInv)
     bondGuess = -1/(4*hInv*(xeAvg)**2);
 
     return bondGuess
@@ -384,16 +370,14 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
     else:
         return sumArcRight
   
-def final_script(xActual,zActual,sigmaGuess,bondGuess,deltaRho,nReload,
-                 nPoints=2000,thetaGuess=0):
+def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
+                 nPoints=1000,thetaGuess=0):
     
     #splitting data at apex into left and right side
     xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
     
-    #determine necessary range of integration 
-        
-    
-    # initial guesses to start rountine 
+    # initial guesses to start rountine
+    sigmaGuess = deltaRho*9.81*r0Guess**2/bondGuess
     r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
     initGuess = [sigmaGuess,r0Guess,thetaGuess]
 
@@ -444,7 +428,7 @@ if __name__ == "__main__":
     # fitting based on z coordinates
     testObjFunV2 = False
     # importing test data for analysis
-    testData = True
+    testData = False
     # vizualization of objective function as a surface plot
     viewObjFunSurf = False
     #summation arc lengh
@@ -461,7 +445,8 @@ if __name__ == "__main__":
         nPoints = 2000
         Bond_actual = deltaRho*9.81*r0**2/sigma
         xActual,zActual = get_test_data(sigma,r0,deltaRho,nPoints,L)
-         
+              
+        
         #splitting data at apex into left and right side
         xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
         
@@ -473,24 +458,34 @@ if __name__ == "__main__":
     if testObjFunV2:       
               
         # initial guesses to start rountine 
-        nReload = 3
-        sigmaGuess = 0.03
-        R0Guess = 0.001
-    
-        initGuess=[sigmaGuess,R0Guess]
- 
+        nReload = 1
+        sigmaGuess = 0.05
+        thetaGuess = 0
+        s,xe = bond_calc(xActual,zActual)
+        bondGuess = s_interp(s,xe)  
+
+        r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
+        initGuess = [sigmaGuess,r0Guess,thetaGuess]
+        
+        intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Guess)
+        
         # calling out optimization routine with reload
         for i in range(nReload):
             r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,
-                                xDataLeft,zDataLeft,xDataRight,zDataRight),
+                                xDataLeft,zDataLeft,xDataRight,zDataRight,intRange),
                                 method='Nelder-Mead',tol=1e-9)
-            initGuess=[r.x[0],r.x[1]]
-            sigmaFinal=r.x[0]
-            r0Final=r.x[1]
+            initGuess = [r.x[0],r.x[1],r.x[2]]
+            sigmaFinal = r.x[0]
+            r0Final = r.x[1]
+            thetaFinal = r.x[2]
             bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
-
-            xFit,zFit=young_laplace(bondFinal,nPoints,L)
             
+            intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
+            xFit,zFit=young_laplace(bondFinal,nPoints,intRangeFinal)
+            
+            xFit = xFit*np.cos(thetaFinal) - zFit*np.sin(thetaFinal)
+            zFit = xFit*np.sin(thetaFinal) + zFit*np.cos(thetaFinal)
+        
             # plot values with fitted bond number and radius of curvature at apex            
             xCurveFit=xFit*r0Final
             zCurveFit=zFit*r0Final
@@ -503,10 +498,9 @@ if __name__ == "__main__":
             plt.axis('equal')
             plt.plot(xCurveFit_App,zCurveFit_App,'b')
             plt.pause(1)
-
-    t1 = time.time()
+        t1 = time.time()
      
-    print "Running Time:",t1-t0,"seconds"
+        print "Surface tension = ",sigmaFinal,"N/m"
     
     if testArcSum:
         intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
