@@ -4,6 +4,7 @@ Created on Thu Jun 22 12:26:32 2017
 
 @author: Yohan
 """
+
 #import code blocks
 import image_extraction as ie
 import image_processing as ip
@@ -13,6 +14,11 @@ import data_processing as dp
 import tkFileDialog
 import matplotlib.pyplot as plt
 import os
+
+#INput Parameters  
+deltaRho = 998
+actualDiameter = 2.108 #in mm
+reloads = 1
 
 #function to display image on plt
 def display_plot(obj):
@@ -65,7 +71,6 @@ rotationAngle = 0
 print ("rotation angle against vertical axis is " + str(rotationAngle))
 
 #get magnification ratio
-actualDiameter = 1.67 #in mm
 magnificationRatio = ip.get_magnification_ratio(interfaceCoordinates, actualDiameter)
 print ("magnification ratio is " + str(magnificationRatio))
 
@@ -75,7 +80,6 @@ x,y = pts[0]
 xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] # map applies the function passed as 
 yCoords = [y,y]
 dropCoords = ip.isolate_drop(xCoords,yCoords,interfaceCoordinates)
-display_scat(dropCoords)
 print ("drop isolated")
 
 #shift coordinates so apex is at 0,0
@@ -99,14 +103,10 @@ print ("scaled coordinates according to magnification ratio")
 #reorder data points
 xData,zData = ip.reorder_data(scaledCoords)
 
-#throw into optimization routine
-sigmaInit = 0.05
-deltaRho = 998
-reloads = 3
-
-s,xe = dp.bond_calc(xData,zData)
+s,xe,apexRadiusGuess = dp.bond_calc(xData,zData)
 bondInit = dp.s_interp(s,xe)
 
-surfTen,apexRadius,thetaRotation,bondNumber = dp.final_script(xData,zData,sigmaInit,bondInit,
-                                                deltaRho,reloads)
+surfTen,apexRadius,thetaRotation,bondNumber = dp.optimize_params(xData,zData,bondInit,
+                                                apexRadiusGuess,deltaRho,reloads)
 
+print "Surface tension = %.4g mN/m" %(surfTen*10**3)
