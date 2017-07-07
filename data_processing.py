@@ -11,13 +11,11 @@ from scipy.integrate import ode
 import matplotlib.pyplot as plt
 import time
 
-t0 = time.time()
-
-#set equations
 def ode_system(t,y,bond):
     """
     Outputs system of ordinary differential equations with non-dimensionalized
-    coordinates --> f = [d(fi)/ds , d(X)/ds , d(Z)/ds]
+    coordinates --> f = [d(fi)/ds , d(X)/ds , d(Z)/ds].
+    
     t    = float - range of integration vector
     y    = float - desired solution to ODE system [fiVec, xVec, zVec]
     bond = float - Bond number
@@ -26,7 +24,6 @@ def ode_system(t,y,bond):
     f = [2-bond*(z)-np.sin(phi)/(r), np.cos(phi), np.sin(phi)]
     return f
     
-#define ode solver function
 def young_laplace(Bo,nPoints,L):
     """
     Bo      = float - Bond number
@@ -73,14 +70,13 @@ def young_laplace(Bo,nPoints,L):
     return r,z
 
 
-
 def get_response_surf(p1Range,p2Range,obj_fun,xData,zData,deltaRho,N=100):
     """
     Plot the error surface for an objective function for a 2D optimization 
     problem.
-    p1Range = List - [minVal,maxval]
-    p2Range = List - [minVal,maxval]
     
+    p1Range = List - [minVal,maxval]
+    p2Range = List - [minVal,maxval]    
     """
     
     # Create maxtrices of parameter value pairs to test
@@ -100,18 +96,18 @@ def get_response_surf(p1Range,p2Range,obj_fun,xData,zData,deltaRho,N=100):
     return X,Y,Z
     
     
-def get_test_data(sigma,r0,deltaRho,N,L):
-    
+def get_test_data(sigma,r0,deltaRho,N,L):   
     """
-    Generate drop profile data for testing purposes.
-    sigma = float: surface tension in N/m
-    r0 = 
-    deltaRho
-    N = int: number of data points on one side of droplet (give 2N-1 points)
-    L = float: 
+    Generates drop profile data for testing purposes (can comment out pixelation section).
+    
+    sigma    = float - surface tension in N/m
+    r0       = float - radius of curvature at apex 
+    deltaRho = float - density difference between two fluids
+    N        = int - number of data points on one side of droplet (give 2N-1 points)
+    L        = float - integration range 
     """
     
-    # Define Bond Number and solve Young Laplace Eqn.
+    #define Bond Number and solve Young Laplace Eqn.
     bond = deltaRho*9.81*r0**2/sigma
     
     xData,zData = young_laplace(bond,N,L)
@@ -121,7 +117,7 @@ def get_test_data(sigma,r0,deltaRho,N,L):
     xData = np.append(list(reversed(-xData)),xData[1:])
     zData = np.append(list(reversed(zData)),zData[1:])
     
-    # Convert to arrays and artificially pixelate
+    #convert to arrays and artificially pixelate
     xData = np.array(xData)
     zData = np.array(zData)
     xData = np.int64(xData*100000)/100000.0
@@ -129,46 +125,6 @@ def get_test_data(sigma,r0,deltaRho,N,L):
        
     return xData, zData
     
-def get_data_apex(xData,zData):
-    """
-    Determines droplet apex from x and z coordinates provided through image
-    processing
-    
-    xData = float -  x coordinates of droplet
-    zData = float - z coordinates of droplet     
-    """
-
-    # finding index of all the minimum z locations to identify location of apex
-    indices = np.argwhere(zData == np.min(zData))
-    xApex = np.average(xData[indices])
-    zApex = np.min(zData)
-    
-    apexIndex = np.average(indices)
-    
-    xApex = np.array([xApex])
-    zApex = np.array([zApex])
-    
-    return xApex,zApex,apexIndex,indices
-
-def add_interp_point(xData,zData,xApex,zApex,index):
-    """
-    Adds interpolated data point if the number of apex indices are an even number 
-    (result of pixelation)
-    
-    xData = float - x coordinates of droplet
-    zData = float - z coordinates of droplet
-    xApex = float - x coordinates at droplet apex    
-    zApex = float - z coordinates at droplet apex
-    index = float - indices of droplet apex (from zData)      
-    """
-    newApexIndex = int(np.average(index))
-    
-    xData = np.insert(xData,newApexIndex,xApex)
-    zData = np.insert(zData,newApexIndex,zApex)
-    
-    return xData,zData,newApexIndex
-    
-  
 def tiling_matrix(zActualLeft,zActualRight,zModel):
     """
     Creates tiled matrices for subsequent model to data point comparison.
@@ -212,12 +168,11 @@ def split_data(xActual,zActual):
     """
     Splits x and z droplet coordinates into two halves at the apex.
     
-    xData = float - x coordinates of droplet
-    zData = float - z coordinates of droplet   
+    xActual = float - x coordinates of droplet
+    zActual = float - z coordinates of droplet   
     """
 
-#    #find apex of droplet and the corresponding index (or indices) and values
-
+   #find apex of droplet and the corresponding index (or indices) and values
     xDataLeft = ()
     xDataRight = ()
     zDataLeft = ()
@@ -235,12 +190,11 @@ def split_data(xActual,zActual):
     return xDataLeft,zDataLeft,xDataRight,zDataRight
 
 
-
 def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
                      zDataRight,sFinal,numberPoints=1000):
     """
-    Calculates the sum of residual error squared between x data and theorectical points
-    through a comparison of z coordinates.
+    Calculates the sum of residual error squared between x data and 
+    theorectical points through a comparison of z coordinates.
     
     params   = float - fitting parameters for optimization rountine
     deltaRho = float - density differential between fluids
@@ -280,7 +234,11 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
 
 def bond_calc(xActual,zActual):
     """
-    Spits out an initial guess for bond Number based on droplet profile
+    Finds s, xe and r0 parameters for initial guess of bond Number based on 
+    droplet profile.
+    
+    xActual = float - x coordinates of droplet 
+    zActual = float - z coordinates of droplet 
     """
     #splitting data at apex into left and right side
     xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
@@ -312,12 +270,16 @@ def bond_calc(xActual,zActual):
     
 def s_interp(sAvg,xeAvg):
     """
-    Searches for value to interpolate for s vs 1/H
+    Searches for value to interpolate for s vs 1/H, relationships as described
+    by Ambwain and Fort Jr., 1979.
+    
+    sAvg  = float - average s value over two halves of droplet
+    xeAvg = float - average xe value over two halves of droplet
     """
-    # leverage relationship as described by Ambwani and Fort Jr. , 1979 
     
     if sAvg >= .9:
-        hInv = (.30715/sAvg**2.84636) + (-.69116*sAvg**3)-(-1.08315*sAvg**2)+(-.18341*sAvg)-(.20970)
+        hInv = (.30715/sAvg**2.84636) + (-.69116*sAvg**3)-(-1.08315*sAvg**2)+ \
+        (-.18341*sAvg)-(.20970)
     elif sAvg >= .68:
         hInv = (.31345/sAvg**2.64267) - (.09155*sAvg**2)+(.14701**sAvg)-(.05877)
     elif sAvg >= .59:
@@ -331,7 +293,6 @@ def s_interp(sAvg,xeAvg):
         #Use formula for S > 0.401 even though it is wrong
         hInv = (.32720/sAvg**2.56651) - (.97553*sAvg**2)+(.84059*sAvg)-(.18069);
         
-    print(hInv)
     bondGuess = -1/(4*hInv*(xeAvg)**2);
 
     return bondGuess
@@ -339,8 +300,9 @@ def s_interp(sAvg,xeAvg):
   
 def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
     """
-    Computes the arc length of data points assuming that 
-    Computes the arc length of data points assuming straight line distances
+    Computes the arc length of data points through discretization using 
+    straight line distances.
+    
     xData = float - x coordinates of droplet
     zData = float - z coordinates of droplet 
     """
@@ -351,7 +313,7 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
     zActualLeft = np.append(zActualLeft,0)
     zActualRight = np.append(0,zActualRight)
 
-    # calculate the straight line distance between each point
+    #calculate the straight line distance between each point
     arcDistLeft = ((abs(xActualLeft[1:])-abs(xActualLeft[:-1]))**2
                     + (abs(zActualLeft[1:])-abs(zActualLeft[:-1]))**2)**0.5
     
@@ -372,6 +334,20 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
   
 def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
                  nPoints=1000,thetaGuess=0):
+    """
+    Optimizes bondnumber, apex radius of curvature, and rotational angle to fit
+    curve (as described through system of ODEs) to data points. Outputs fitted
+    parameters and resultant surface tension.
+    
+    xActual    = float - x-coordinate values of droplet data points
+    zActual    = float - z-coordinate values of droplet data points
+    bondGuess  = float - inital guess for bond number
+    r0Guess    = float - inital guess for radius of curvature at apex
+    deltaRho   = float - density difference between two fluids (user input)
+    nReload    = int - number of reloads for optimization rountine (user input)
+    nPoints    = int - number of points on theorectical curve
+    thetaGuess = float - inital guess for rotational angle (radians)
+    """
     
     #splitting data at apex into left and right side
     xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
@@ -416,11 +392,8 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
 
     return sigmaFinal,r0Final,thetaFinal,bondFinal
 
-  
-t1 = time.time()
-
-
-    
+######################## For Testing Purposes #################################   
+   
 if __name__ == "__main__":
     
     plt.close('all')
@@ -480,7 +453,8 @@ if __name__ == "__main__":
             thetaFinal = r.x[2]
             bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
             
-            intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
+            intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,
+                                             zDataRight,r0Final)
             xFit,zFit=young_laplace(bondFinal,nPoints,intRangeFinal)
             
             xFit = xFit*np.cos(thetaFinal) - zFit*np.sin(thetaFinal)
@@ -508,10 +482,8 @@ if __name__ == "__main__":
     if testInitBond:
         s,xe = bond_calc(xActual,zActual)
         initBondGuess = s_interp(s,xe)
-        
 
-
-
+    #update this section with new script        
     if viewObjFunSurf:
         #Create Test Data
         sigma=0.05
@@ -519,7 +491,7 @@ if __name__ == "__main__":
         deltaRho=900
         x,z = get_test_data(sigma,r0,deltaRho)
         
-        X,Y,Z = get_response_surf([.02,.1],[.001,.01],objective_fun,x,z,
+        X,Y,Z = get_response_surf([.02,.1],[.001,.01],objective_fun_v2,x,z,
                            deltaRho,N=10)
                            
         ax = Axes3D(plt.figure())
