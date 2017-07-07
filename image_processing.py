@@ -4,8 +4,7 @@ Created on Mon May 29 10:03:52 2017
 
 @author: Yohan
 """
-import math
-from scipy import stats
+
 from skimage import feature
 import cv2
 import numpy as np
@@ -13,22 +12,36 @@ import data_processing as dp
 
 def binarize_image(image):
     """
-    binarize image to convert the image to purely black and white image
+    Binarize image to convert the image to purely black and white image.
+    
+    image = JPEG - image file of droplet 
     """
+    #use Otsu's threshold after Gaussian filtering (Otsu's binarization)
+    #filter image with 5x5 Gaussian kernel to remove noise
     blur = cv2.GaussianBlur(image,(5,5),0)
     ret3,binaryImage = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     return binaryImage
     
 def detect_boundary(binaryImage):
-    #detect the outline of the binary image
+    """
+    Detects the outline of the binary image and outputs in boolean format.
+    
+    binaryImage = uint8 - black and white image of droplet
+    """
+    #use canny edge detection algorithm to find edges of image
+    #edge dectection operator goes line-by-line horizontally
     edges = feature.canny(binaryImage)
     
     return edges
     
 def get_interface_coordinates(edges):
     """
-    go through each pixel in the edges image to extract the coordinates of the edges
+    Goes through each pixel in the edges image to extract the coordinates of 
+    the edges.
+    
+    edges = boolean - edge profile of droplet 
     """
+    #creates array of edge coordinates with respect to pixel length
     interfaceCoords = []
     for y in range(0,edges.shape[0]):
         edgeCoords = []
@@ -43,51 +56,35 @@ def get_interface_coordinates(edges):
     interfaceCoords = np.array(interfaceCoords)
     return interfaceCoords
     
-def get_rotation_angle(interfaceCoords):
+def get_capillary_diameter(line1, line2):
     """
-    get coordinates of a few points along the capillary tube
-    """
-    lineCoords = interfaceCoords[0:51:2]
-    lineCoordsX = [x[0] for x in lineCoords]
-    lineCoordsY = [x[1] for x in lineCoords]
-        
-    #use the inverse slope and flat line slope to calculate since
-    #we can't compare infinite slope (vertical line) and actual slope
-        
-    #calculate inverse slope
-    slope, intercept, r_value, p_value, std_err = stats.linregress(lineCoordsY,lineCoordsX)
-    flatLineSlope = 0
-        
-    #trig function to calculate angle (in rads) using the slopes of 2 lines
-    rotationAngle = math.atan((slope-flatLineSlope)/(1+(slope*flatLineSlope)))
-    rotationAngleDegrees = rotationAngle*360/(2*math.pi)
+    Defines capillary diameter in pixel length.
     
-    #if rotational angle is being set to horizontal (quick and dirty fix)
-    if rotationAngleDegrees > 45:
-        rotationAngleDegrees = 90-rotationAngleDegrees
-
-    return rotationAngleDegrees
-    
-def get_min_distance(line1, line2):
-    """
-    Define straight line distance between perpindicular points on capillary
-    """
-    line1 = np.array(line1)
-    line2 = np.array(line2)
-
+    line1 = int32 - first point on left edge of capillary
+    line2 = int32 - second point on right edge of capillary
+    """     
+    #express first points on opposite side of capillary as x,z coordinates
     L1x,L1y = line1
     L2x,L2y = line2
     
+    #find straight line distance between points
     dist = ((L2x-L1x)**2+(L2y-L1y)**2)**0.5
 
+    #Assumption: rotation of image is very small such that the scaled straight
+    #line distance is very close to true diameter of the capillary 
     return dist
     
 def get_magnification_ratio(interfaceCoords, actualDiameter):
     """
-    determines magnification ratio through a comparison of capillary diameter
+    Determines magnification ratio through a comparison of capillary diameter.
+    
+    interfaceCoords = int32 - array of edge coordinates (x,z) in pixel length
+    actualDiameter = float - actual outer diameter of capillary (user input)
     """
     
-    #first points from capillary
+    #find first points on capillary edge  
+    #assume that next point on same capillary edge is within a one pixel offset 
+    #in x-direction - recall horizontal line-by-line output from canny edge dection 
     if interfaceCoords[0,0]-1 <= interfaceCoords[1,0] <= interfaceCoords[0,0]+1:
         lineCoords = interfaceCoords[0]
         adjLineCoords = interfaceCoords[2]
@@ -96,29 +93,47 @@ def get_magnification_ratio(interfaceCoords, actualDiameter):
         adjLineCoords = interfaceCoords[1]
         
     #calculate line distance and magnification ratio
-    lineDistance = get_min_distance(lineCoords,adjLineCoords)
+    lineDistance = get_capillary_diameter(lineCoords,adjLineCoords)
     magnificationRatio = actualDiameter/lineDistance
     
     return magnificationRatio
     
-def calculate_dot_product(vectEndX, vectEndY, pointCoordX, pointCoordY):
-    xp = (vectEndX[1]-vectEndX[0])*(pointCoordY-vectEndY[0])-(vectEndY[1]-vectEndY[0])*(pointCoordX-vectEndX[0])
+def calculate_dot_product(vectEndX, vectEndZ, pointCoordX, pointCoordZ):
+    """
+    Looks if the linePosition is above or below user defined point for 
+    isolating drop.
+    
+    vectEndX = list - total x range (in pixels) of droplet
+    vectEndZ = list - z-coordinate (in pixels) of user input for isolating droplet
+    pointCoordX = int32 - x-coordinates of droplet
+    pointCoordZ = int32 - z-coordinates of droplet 
+    """
+    
+    #loop that returns boolean expressions depending on whether coordinate is 
+    #below the line
+    xp = (vectEndX[1]-vectEndX[0])*(pointCoordZ-vectEndZ[0])- \
+                    (vectEndZ[1]-vectEndZ[0])*(pointCoordX-vectEndX[0])
     if xp < 0:
         return True
     else:
         return False
         
-def isolate_drop(lineCoordX, lineCoordY, interfaceCoords):
+def isolate_drop(lineCoordX, lineCoordZ, interfaceCoords):
     """
-    checks whether point is above or below line using the calculate_cross_product function above
-    if line_position is above (True), keep looping, else is below (False) therefore stop looping
+    Checks whether point is above or below line using the calculate_cross_product 
+    function to see if linePosition is: above (True) --> keep looping, else is 
+    below (False) --> stop looping.
+    
+    lineCoordX = list - total x range (in pixels) of droplet
+    lineCoordZ = list - z-coordinate (in pixels) of user input for isolating droplet
     """
     linePosition = True
     cutoffPoint = None    
     
     #loop to find the outline coordinate where the outline coordinate is below the line
     for i in range (0, len(interfaceCoords)):
-        linePosition = calculate_dot_product(lineCoordX, lineCoordY,interfaceCoords[i,0], interfaceCoords[i,1])
+        linePosition = calculate_dot_product(lineCoordX, lineCoordZ,
+                                    interfaceCoords[i,0], interfaceCoords[i,1])
         if linePosition is False:
             cutoffPoint = i
             break
@@ -138,9 +153,9 @@ def shift_coords(xCoords, zCoords, newCenter):
     """ 
     Shift the coordinates so that the orgin is at the specified center.
     
-    coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
-    newCenter = ndarray (1,i)
-    oldCenter (optional) = ndarray(1,i)
+    xCoords = int32 - x-coordinates of droplet pre-shift
+    zCoords = int32 - z-coordinates of droplet pre-shift
+    newCenter = list - desired new center (defined as (0,0))
     """
     
     #determine offset of current droplet center
@@ -158,44 +173,29 @@ def shift_coords(xCoords, zCoords, newCenter):
 
     #flip the coordinates vertically
     coords *= [1,-1]
+    
     return coords
     
 def scale_drop(coords, magnificationRatio):
     """ 
-    Scale the coordinate based on the magnification ratio
+    Scales the coordinate based on the magnification ratio.
     
-    coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
-    magnificationRatio = float
+    coords = ndarray (N,i) where i is the dimensionality (i.e 2D)
+    magnificationRatio = float - pixel to meters scaling conversion 
     """
     #changing units to meters
     scaledCoords = coords * [magnificationRatio*10**-3, 
                              magnificationRatio*10**-3] 
     return scaledCoords
     
-def rotate_coords(coords,angle,format='radians'):
-    """ 
-    Shift the coordinates so that the orgin is at the specified center.
-    Rotates COUNTER-CLOCKWISE respective to the angle given in the argument
-    
-    coords = ndarray (N,i) where i is the dimensionality (i.e 2D).
-    angle = float in radians
-    format (optional) = string specifying radians or degrees
-    """
-    x = coords[:,0]
-    y = coords[:,1]
-    if format is 'degrees':
-        angle *= np.pi/180
-    xRot = x*np.cos(angle) - y*np.sin(angle)
-    yRot = x*np.sin(angle) + y*np.cos(angle)
-    coords[:,0] = xRot
-    coords[:,1] = yRot
-    return coords    
-
 def reorder_data(coords):
     """
-    Re-order data into arrays that smoothly follow the drop profile (connected)
+    Re-orders data into 2-D array that smoothly follows the drop profile.
+    
+    coords = ndarray (N,i) where i is the dimensionality (i.e 2D)
     """
     
+    #sort in ascending z-value order
     coords = coords[coords[:,1].argsort()]
     
     xData = coords[:,0]
@@ -206,7 +206,7 @@ def reorder_data(coords):
     xDataLeft = ()
     zDataLeft = ()
     
-    # seperate left and right side of droplet by positive or negative x-coord value
+    #seperate left and right side of droplet by positive or negative x-coord 
     for i in range(len(xData)):
     
         if xData[i] < 0:
@@ -222,7 +222,7 @@ def reorder_data(coords):
             zDataRight = np.append(zDataRight,zData[i])
 
                        
-    # Reorders data in descending z order
+    #reorders data in descending z order
     indexLeft = np.lexsort((xDataLeft,-1*zDataLeft))    
     indexRight = np.lexsort((xDataRight,zDataRight))    
 
@@ -231,13 +231,14 @@ def reorder_data(coords):
     zDataLeft = zDataLeft[indexLeft]
     zDataRight = zDataRight[indexRight]
     
+    #append left and right side coordinates
     xCoords = np.append(xDataLeft,xDataRight[1:])
     zCoords = np.append(zDataLeft,zDataRight[1:])
 
     return xCoords,zCoords         
                
-
-#For Testing Purposes    
+######################## For Testing Purposes ################################# 
+   
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
@@ -267,9 +268,7 @@ if __name__ == "__main__":
     
     #flag3 = test for get_interface_coordinates()
     flag3 = False
-    
-    #flag4 = test for get_rotation_angle()
-    flag4 = False
+
     
     #flag5 = test for get_min_distance()
     flag5 = False
@@ -289,9 +288,7 @@ if __name__ == "__main__":
     #flag10: test for scale_drop
     flag10 = False
     
-    #flag11: test for rotate_coords
-    flag11 = False
-    
+
     #flag12: test for reordering data
     flag12 = False
     
@@ -316,23 +313,12 @@ if __name__ == "__main__":
         interfaceCoordinates = get_interface_coordinates(edges)
         print interfaceCoordinates
         plt.scatter(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
-        
-    #flag4 = test for get_rotation_angle()
-    if(flag4 == True):
-        #set up test array
-        testArray = []
-        for i in range(0,59):
-            testArray.append([i,i+0.6*i])
-        print testArray
-        
-        rotationAngle = get_rotation_angle(testArray)
-        print rotationAngle
-        
+           
     #flag5 = test for get_min_distance()
     if(flag5 == True):
         lineEnds1 = [471,1]
         lineEnds2 = [656,1]
-        minDistance = get_min_distance(lineEnds1,lineEnds2)
+        minDistance = get_capillary_diameter(lineEnds1,lineEnds2)
         print minDistance
         
     #flag6: test for get_magnification_ratio()
@@ -356,7 +342,8 @@ if __name__ == "__main__":
         testVectEndY = [10,6]
         testPointCoordX = 5
         testPointCoordY = 2 #change value to test
-        testBool = calculate_dot_product(testVectEndX, testVectEndY, testPointCoordX, testPointCoordY)
+        testBool = calculate_dot_product(testVectEndX, testVectEndY, 
+                                         testPointCoordX, testPointCoordY)
         print testBool
    
     #flag8: test for isolate_drop     
@@ -385,12 +372,6 @@ if __name__ == "__main__":
         print scaledDropCoords
         plt.scatter(scaledDropCoords[:,0],scaledDropCoords[:,1])
         
-    #flag11: test for rotate_coords
-    if(flag11 == True):
-        angle = 300 #degrees0
-        finalCoords = rotate_coords(testArray, angle, 'degrees')
-        print finalCoords
-        plt.scatter(finalCoords[:,0],finalCoords[:,1])
-        
+
     if flag12:
         xReal,zReal = reorder_data(testArray)
