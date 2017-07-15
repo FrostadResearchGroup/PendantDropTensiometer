@@ -13,6 +13,8 @@ import data_processing as dp
 #import other modules
 import tkFileDialog
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.axes3d import Axes3D
+import numpy as np
 import os
 
 ##############################################################################
@@ -97,3 +99,9 @@ surfTen,apexRadius,thetaRotation,bondNumber = dp.optimize_params(xData,zData,bon
 
 #output surface tension
 print "Surface tension = %.4g mN/m" %(surfTen*10**3)
+
+#output error surface plot
+x,y,z = dp.get_response_surf(surfTen,apexRadius,thetaRotation,deltaRho,xData,zData,dp.objective_fun_v2)
+ax = Axes3D(plt.figure())
+ax.plot_surface(x,y,np.log10(z))
+
