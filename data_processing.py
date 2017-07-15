@@ -70,18 +70,32 @@ def young_laplace(Bo,nPoints,L):
     return r,z
 
 
-def get_response_surf(p1Range,p2Range,obj_fun,xData,zData,deltaRho,N=100):
+def get_response_surf(sigma,r0,theta,deltaRho,xActual,zActual,objective_fun_v2,N=100):
     """
     Plot the error surface for an objective function for a 2D optimization 
     problem.
     
-    p1Range = List - [minVal,maxval]
-    p2Range = List - [minVal,maxval]    
+    sigma            = float - surface tension (N/m)
+    r0               = float - radius of curvature at apex (m)
+    theta            = float - rotation angle
+    deltaRho         = float - density difference between two fluids (kg/m^3)
+    xActual          = float - x coordinates of droplet 
+    zActual          = float - z coordinates of droplet
+    objective_fun_v2 = function - objective function, comparison of x values
     """
+    
+    #split data and get arc length
+    xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)    
+    sFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
+    
+    #create range to plot for surface tension and apex radius
+    p1Range = [0,2*sigma]
+    p2Range = [0,2*r0]
     
     # Create maxtrices of parameter value pairs to test
     p1List = np.linspace(p1Range[0],p1Range[1],N)
     p2List = np.linspace(p2Range[0],p2Range[1],N)
+    
     X,Y = np.meshgrid(p1List,p2List)
     # Initialize matrix of error values
     Z = np.zeros_like(X)
@@ -91,12 +105,13 @@ def get_response_surf(p1Range,p2Range,obj_fun,xData,zData,deltaRho,N=100):
         for j in range(len(Y)):
             p1 = X[i,j]
             p2 = Y[i,j]
-            Z[i,j] = obj_fun([p1,p2],deltaRho,xData,zData)
-            
+            Z[i,j] = objective_fun_v2([p1,p2,theta],deltaRho,xDataLeft,zDataLeft,xDataRight,
+                                 zDataRight,sFinal,numberPoints=10)
+                
     return X,Y,Z
     
     
-def get_test_data(sigma,r0,deltaRho,N,L):   
+def get_test_data(sigma,r0,deltaRho,N=100,L=30):   
     """
     Generates drop profile data for testing purposes (can comment out pixelation section).
     
@@ -105,8 +120,8 @@ def get_test_data(sigma,r0,deltaRho,N,L):
     deltaRho = float - density difference between two fluids
     N        = int - number of data points on one side of droplet (give 2N-1 points)
     L        = float - integration range 
-    """
-    
+    """    
+        
     #define Bond Number and solve Young Laplace Eqn.
     bond = deltaRho*9.81*r0**2/sigma
     
@@ -117,11 +132,11 @@ def get_test_data(sigma,r0,deltaRho,N,L):
     xData = np.append(list(reversed(-xData)),xData[1:])
     zData = np.append(list(reversed(zData)),zData[1:])
     
-    #convert to arrays and artificially pixelate
-    xData = np.array(xData)
-    zData = np.array(zData)
-    xData = np.int64(xData*100000)/100000.0
-    zData = np.int64(zData*100000)/100000.0
+#    #convert to arrays and artificially pixelate
+#    xData = np.array(xData)
+#    zData = np.array(zData)
+#    xData = np.int64(xData*100000)/100000.0
+#    zData = np.int64(zData*100000)/100000.0
        
     return xData, zData
     
@@ -191,7 +206,7 @@ def split_data(xActual,zActual):
 
 
 def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
-                     zDataRight,sFinal,numberPoints=1000):
+                     zDataRight,sFinal,numberPoints=100):
     """
     Calculates the sum of residual error squared between x data and 
     theorectical points through a comparison of z coordinates.
@@ -333,7 +348,7 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
         return sumArcRight
   
 def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
-                 nPoints=1000,thetaGuess=0):
+                 nPoints=100,thetaGuess=0):
     """
     Optimizes bondnumber, apex radius of curvature, and rotational angle to fit
     curve (as described through system of ODEs) to data points. Outputs fitted
@@ -367,8 +382,8 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
                             method='Nelder-Mead',tol=1e-9)
         initGuess = [r.x[0],r.x[1],r.x[2]]
         sigmaFinal = r.x[0]
-        r0Final = r.x[1]
         thetaFinal = r.x[2]
+        r0Final = r.x[1] * np.cos(thetaFinal)
         bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
         
         intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
@@ -448,9 +463,9 @@ if __name__ == "__main__":
                                 xDataLeft,zDataLeft,xDataRight,zDataRight,intRange),
                                 method='Nelder-Mead',tol=1e-9)
             initGuess = [r.x[0],r.x[1],r.x[2]]
-            sigmaFinal = r.x[0]
-            r0Final = r.x[1]
+            sigmaFinal = r.x[0]            
             thetaFinal = r.x[2]
+            r0Final = r.x[1] * np.cos(thetaFinal)
             bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
             
             intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,
