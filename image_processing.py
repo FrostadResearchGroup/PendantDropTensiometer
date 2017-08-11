@@ -18,10 +18,16 @@ def binarize_image(image):
     """
     #use Otsu's threshold after Gaussian filtering (Otsu's binarization)
     #filter image with 5x5 Gaussian kernel to remove noise
+    
+    #rotate image 90 degrees
+    image = image.transpose()  
+    
     blur = cv2.GaussianBlur(image,(5,5),0)
     ret3,binaryImage = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    return binaryImage
     
+    
+    return binaryImage
+
 def detect_boundary(binaryImage):
     """
     Detects the outline of the binary image and outputs in boolean format.
@@ -55,6 +61,21 @@ def get_interface_coordinates(edges):
             interfaceCoords = interfaceCoords + [edgeCoords[0]]      
     interfaceCoords = np.array(interfaceCoords)
     return interfaceCoords
+
+#def rotate_coords(interfaceCoords):
+#    """
+#    Rotates image by 90 degrees (due to camera being tilted on side)
+#    
+#    interfaceCoords = array - pixel coordinates of droplet
+#    """
+#    
+#    interfaceCoords = interfaceCoords.transpose()
+#    rotationMatrix  = np.array([[np.cos(-90),-np.sin(-90)],[np.sin(-90),np.cos(-90)]])
+#    
+#    rotatedCoords   = rotationMatrix * interfaceCoords
+#    rotatedCoords   = rotationMatrix.transpose()
+#    
+#    return rotatedCoords
     
 def get_capillary_diameter(line1, line2):
     """
@@ -168,6 +189,10 @@ def shift_coords(xCoords, zCoords, newCenter):
     zDifference = oldCenter[1] - newCenter[1]
     xCoords -= xDifference
     zCoords -= zDifference
+    
+    #artifically rotate data (FOR TESTING PURPOSES)
+    xCoords = xCoords*np.cos(-5*2*np.pi/360) - zCoords*np.sin(-5*2*np.pi/360)
+    zCoords = xCoords*np.sin(-5*2*np.pi/360) + zCoords*np.cos(-5*2*np.pi/360)  
     
     coords = np.append([xCoords],[zCoords],axis=0).transpose()
 
