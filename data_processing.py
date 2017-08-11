@@ -205,8 +205,21 @@ def split_data(xActual,zActual):
     return xDataLeft,zDataLeft,xDataRight,zDataRight
 
 
+def rotate_data(xActualLeft,zActualLeft,xActualRight,zActualRight,thetaVal):
+    """
+    Rotates data for optimization of theta parameter
+    """
+    #rotate data points with theta parameter
+    xActualLeft = xActualLeft*np.cos(thetaVal) - zActualLeft*np.sin(thetaVal)
+    zActualLeft = xActualLeft*np.sin(thetaVal) + zActualLeft*np.cos(thetaVal)
+    
+    xActualRight = xActualRight*np.cos(thetaVal) - zActualRight*np.sin(thetaVal)
+    zActualRight = xActualRight*np.sin(thetaVal) + zActualRight*np.cos(thetaVal)
+    
+    return xActualLeft,zActualLeft,xActualRight,zActualRight
+
 def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
-                     zDataRight,sFinal,numberPoints=100):
+                     zDataRight,sFinal,numberPoints=1000):
     """
     Calculates the sum of residual error squared between x data and 
     theorectical points through a comparison of z coordinates.
@@ -224,14 +237,15 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
     
     #throwing bond number into curve/coordinate generator
     xModel,zModel = young_laplace(bond,numberPoints,sFinal)
-    
-    xModel = xModel*np.cos(theta) - zModel*np.sin(theta)
-    zModel = xModel*np.sin(theta) + zModel*np.cos(theta)
+
 
     #x and z coordinates with arc length
     xModel = xModel*apexRadius
     zModel = zModel*apexRadius
-        
+    
+    #rotate data points with theta parameter
+    xDataLeft,zDataLeft,xDataRight,zDataRight = rotate_data(xDataLeft,zDataLeft,xDataRight,zDataRight,theta)
+    
     #creates tiling matrices for subsequent indexing of data to model comparison
     zDatagridLeft,zModelgridLeft,zDatagridRight,zModelgridRight = tiling_matrix(zDataLeft,zDataRight,zModel)
     
@@ -348,7 +362,7 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
         return sumArcRight
   
 def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
-                 nPoints=100,thetaGuess=0):
+                 nPoints=1000,thetaGuess=0):
     """
     Optimizes bondnumber, apex radius of curvature, and rotational angle to fit
     curve (as described through system of ODEs) to data points. Outputs fitted
@@ -389,9 +403,10 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
         intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
         xFit,zFit=young_laplace(bondFinal,nPoints,intRangeFinal)
         
-        xFit = xFit*np.cos(thetaFinal) - zFit*np.sin(thetaFinal)
-        zFit = xFit*np.sin(thetaFinal) + zFit*np.cos(thetaFinal)
-
+        
+        xActual = xActual*np.cos(thetaFinal) - zActual*np.sin(thetaFinal)
+        zActual = xActual*np.sin(thetaFinal) + zActual*np.cos(thetaFinal)    
+        
         # plot values with fitted bond number and radius of curvature at apex            
         xCurveFit=xFit*r0Final
         zCurveFit=zFit*r0Final
@@ -406,6 +421,13 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
         plt.pause(1)
 
     return sigmaFinal,r0Final,thetaFinal,bondFinal
+
+
+
+
+
+
+
 
 ######################## For Testing Purposes #################################   
    
@@ -472,8 +494,8 @@ if __name__ == "__main__":
                                              zDataRight,r0Final)
             xFit,zFit=young_laplace(bondFinal,nPoints,intRangeFinal)
             
-            xFit = xFit*np.cos(thetaFinal) - zFit*np.sin(thetaFinal)
-            zFit = xFit*np.sin(thetaFinal) + zFit*np.cos(thetaFinal)
+            xFit = xFit*np.cos(-thetaFinal) - zFit*np.sin(-thetaFinal)
+            zFit = xFit*np.sin(-thetaFinal) + zFit*np.cos(-thetaFinal)
         
             # plot values with fitted bond number and radius of curvature at apex            
             xCurveFit=xFit*r0Final
