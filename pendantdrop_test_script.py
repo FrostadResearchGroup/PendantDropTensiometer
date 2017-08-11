@@ -20,9 +20,9 @@ import os
 ##############################################################################
 
 #input parameters  
-deltaRho = 998
-actualDiameter = 2.108 #in mm
-reloads = 1
+deltaRho = 998 #absolute density difference between two fluids in g/L
+actualDiameter = 2.108 #capillary diameter in mm
+reloads = 1 #converge 
 
 ##############################################################################
 
@@ -62,7 +62,6 @@ print("boundary traced")
 interfaceCoordinates = ip.get_interface_coordinates(edges)
 plt.cla()
 plt.scatter(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
-plt.pause(1)
 print("boundary coordinates acquired")
 
 #get magnification ratio
@@ -98,10 +97,11 @@ surfTen,apexRadius,thetaRotation,bondNumber = dp.optimize_params(xData,zData,bon
                                                 apexRadiusGuess,deltaRho,reloads)
 
 #output surface tension
-print "Surface tension = %.4g mN/m" %(surfTen*10**3)
+print "Bond Number = %.4g" %(bondNumber)
+print "Surface Tension = %.4g mN/m" %(surfTen*10**3)
 
 #output error surface plot
-x,y,z = dp.get_response_surf(surfTen,apexRadius,thetaRotation,deltaRho,xData,zData,dp.objective_fun_v2)
-ax = Axes3D(plt.figure())
-ax.plot_surface(x,y,np.log10(z))
+#x,y,z = dp.get_response_surf(surfTen,apexRadius,thetaRotation,deltaRho,xData,zData,dp.objective_fun_v2)
+#ax = Axes3D(plt.figure())
+#ax.plot_surface(x,y,np.log10(z))
 
