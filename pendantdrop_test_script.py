@@ -17,12 +17,13 @@ from mpl_toolkits.mplot3d.axes3d import Axes3D
 import numpy as np
 import os
 
+
 ##############################################################################
 
 #input parameters  
-deltaRho = 998 #absolute density difference between two fluids in g/L
-actualDiameter = 2.108 #capillary diameter in mm
-reloads = 1 #converge 
+deltaRho = 998          #absolute density difference between two fluids in g/L
+actualDiameter = 2.108  #capillary diameter in mm
+reloads = 1             #converge 
 
 ##############################################################################
 
@@ -81,7 +82,7 @@ plt.gca().invert_yaxis()
 newCenter = [0,0]
 shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
 display_scat(shiftedCoords)
-print ("shifted apex to 0,0")
+print ("shifted apex NEAR 0,0")
 
 #scale drop
 scaledCoords = ip.scale_drop(shiftedCoords,magnificationRatio)
@@ -92,16 +93,40 @@ xData,zData = ip.reorder_data(scaledCoords)
 s,xe,apexRadiusGuess = dp.bond_calc(xData,zData)
 bondInit = dp.s_interp(s,xe)
 
+#state guesses for apex shift
+horizShiftGuess = 0
+vertShiftGuess  = 0 
+
 #run through optimization routine
-surfTen,apexRadius,thetaRotation,bondNumber = dp.optimize_params(xData,zData,bondInit,
-                                                apexRadiusGuess,deltaRho,reloads)
+surfTen,apexRadius,thetaRotation,bondNumber,horizTranslation,vertTranslation = dp.optimize_params(xData,zData,bondInit,
+                                                      apexRadiusGuess,horizShiftGuess,
+                                                      vertShiftGuess,deltaRho,reloads)
 
 #output surface tension
 print "Bond Number = %.4g" %(bondNumber)
 print "Surface Tension = %.4g mN/m" %(surfTen*10**3)
+
 
 #output error surface plot
 #x,y,z = dp.get_response_surf(surfTen,apexRadius,thetaRotation,deltaRho,xData,zData,dp.objective_fun_v2)
 #ax = Axes3D(plt.figure())
 #ax.plot_surface(x,y,np.log10(z))
 
+######################## For Testing Purposes ################################# 
+   
+if __name__ == "__main__":
+    
+    testProfiler = True
+    
+    
+    if testProfiler:    
+    
+        #import profiler packages
+        import cProfile
+        import pstats
+        
+        cProfile.run('dp.optimize_params(xData,zData,bondInit,apexRadiusGuess,horizShiftGuess,vertShiftGuess,deltaRho,reloads)','timeStats')
+        p = pstats.Stats('timeStats')
+        
+        #arrange output by largest culmulative tie
+        p.sort_stats('time').print_stats(10)
