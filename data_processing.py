@@ -235,6 +235,15 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
     theta = params[2]
     bond = deltaRho*9.81*apexRadius**2/gamma
     
+    horizApexShift = params[3]
+    vertApexShift  = params[4]
+    
+    #include horizontal and vertical apex shift
+    xDataLeft  = xDataLeft  + horizApexShift
+    xDataRight = xDataRight + horizApexShift
+    zDataLeft  = zDataLeft  + vertApexShift
+    zDataRight = zDataRight + vertApexShift
+    
     #throwing bond number into curve/coordinate generator
     xModel,zModel = young_laplace(bond,numberPoints,sFinal)
 
@@ -361,7 +370,7 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
     else:
         return sumArcRight
   
-def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
+def optimize_params(xActual,zActual,bondGuess,r0Guess,hShiftGuess,vShiftGuess,deltaRho,nReload,
                  nPoints=1000,thetaGuess=0):
     """
     Optimizes bondnumber, apex radius of curvature, and rotational angle to fit
@@ -384,7 +393,7 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
     # initial guesses to start rountine
     sigmaGuess = deltaRho*9.81*r0Guess**2/bondGuess
     r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
-    initGuess = [sigmaGuess,r0Guess,thetaGuess]
+    initGuess = [sigmaGuess,r0Guess,thetaGuess,hShiftGuess,vShiftGuess]
 
 
     intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Guess)
@@ -400,12 +409,15 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
         r0Final = r.x[1] * np.cos(thetaFinal)
         bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
         
+        horizShiftFinal = r.x[3]
+        vertShiftFinal  = r.x[4]
+        
         intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
         xFit,zFit=young_laplace(bondFinal,nPoints,intRangeFinal)
         
         
-        xActual = xActual*np.cos(thetaFinal) - zActual*np.sin(thetaFinal)
-        zActual = xActual*np.sin(thetaFinal) + zActual*np.cos(thetaFinal)    
+        xActual = xActual*np.cos(thetaFinal) - zActual*np.sin(thetaFinal) + horizShiftFinal 
+        zActual = xActual*np.sin(thetaFinal) + zActual*np.cos(thetaFinal) + vertShiftFinal  
         
         # plot values with fitted bond number and radius of curvature at apex            
         xCurveFit=xFit*r0Final
@@ -420,7 +432,7 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,
         plt.plot(xCurveFit_App,zCurveFit_App,'b')
         plt.pause(1)
 
-    return sigmaFinal,r0Final,thetaFinal,bondFinal
+    return sigmaFinal,r0Final,thetaFinal,bondFinal,horizShiftFinal,vertShiftFinal
 
 
 
