@@ -61,8 +61,7 @@ print("boundary traced")
 
 #get interface coordinates
 interfaceCoordinates = ip.get_interface_coordinates(edges)
-plt.cla()
-plt.scatter(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
+display_scat(interfaceCoordinates)
 print("boundary coordinates acquired")
 
 #get magnification ratio
@@ -102,6 +101,7 @@ surfTen,apexRadius,thetaRotation,bondNumber,horizTranslation,vertTranslation = d
                                                       apexRadiusGuess,horizShiftGuess,
                                                       vertShiftGuess,deltaRho,reloads)
 
+
 #output surface tension
 print "Bond Number = %.4g" %(bondNumber)
 print "Surface Tension = %.4g mN/m" %(surfTen*10**3)
@@ -116,7 +116,7 @@ print "Surface Tension = %.4g mN/m" %(surfTen*10**3)
    
 if __name__ == "__main__":
     
-    testProfiler = True
+    testProfiler = False
     
     
     if testProfiler:    
