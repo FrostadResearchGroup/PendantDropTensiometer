@@ -37,7 +37,11 @@ def detect_boundary(binaryImage):
     #use canny edge detection algorithm to find edges of image
     #edge dectection operator goes line-by-line horizontally
     edges = feature.canny(binaryImage)
-    
+
+#    edges = np.array(edges,dtype=np.uint8)
+#    edges, hierarchy = cv2.findContours(edges, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+#    #edges = cv2.findContours(edges,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
     return edges
     
 def get_interface_coordinates(edges):
@@ -56,26 +60,31 @@ def get_interface_coordinates(edges):
                 edgeCoords = edgeCoords + [[x, y]]       
         #takes in only the outer most points
         if(len(edgeCoords)>=2):
-            interfaceCoords = interfaceCoords + [edgeCoords[0]] + [edgeCoords[-1]]
+            truthIndices = np.argwhere(edges)
+            apexIndex = max(truthIndices[:,0])
+            if y != apexIndex:    
+                interfaceCoords = interfaceCoords + [edgeCoords[0]] + [edgeCoords[-1]]
+            else:
+                for i in range(len(edgeCoords)):
+                    interfaceCoords = interfaceCoords + [edgeCoords[i]]
         if(len(edgeCoords)==1):
             interfaceCoords = interfaceCoords + [edgeCoords[0]]      
     interfaceCoords = np.array(interfaceCoords)
+
+#    interfaceCoords, hierarchy = cv2.findContours(interfaceCoords, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)    
+
     return interfaceCoords
 
-#def rotate_coords(interfaceCoords):
-#    """
-#    Rotates image by 90 degrees (due to camera being tilted on side)
-#    
-#    interfaceCoords = array - pixel coordinates of droplet
-#    """
-#    
-#    interfaceCoords = interfaceCoords.transpose()
-#    rotationMatrix  = np.array([[np.cos(-90),-np.sin(-90)],[np.sin(-90),np.cos(-90)]])
-#    
-#    rotatedCoords   = rotationMatrix * interfaceCoords
-#    rotatedCoords   = rotationMatrix.transpose()
-#    
-#    return rotatedCoords
+def get_translation_calibration(interfaceCoords,dropCoords):
+    """
+    Translates the interface and isolated droplet coordinates to same relative position
+    
+    """
+    
+    vertTranslation = min(interfaceCoords[:,1]) - min(dropCoords[:,1])   
+    horzTranslation = (max(interfaceCoords[:,0]) - min(interfaceCoords[:,0]))/2 + (max(dropCoords[:,0]) - min(dropCoords[:,0]))/2
+    return vertTranslation,horzTranslation
+
     
 def get_capillary_diameter(line1, line2):
     """
@@ -139,36 +148,46 @@ def calculate_dot_product(vectEndX, vectEndZ, pointCoordX, pointCoordZ):
     else:
         return False
         
-def isolate_drop(lineCoordX, lineCoordZ, interfaceCoords):
-    """
-    Checks whether point is above or below line using the calculate_cross_product 
-    function to see if linePosition is: above (True) --> keep looping, else is 
-    below (False) --> stop looping.
-    
-    lineCoordX = list - total x range (in pixels) of droplet
-    lineCoordZ = list - z-coordinate (in pixels) of user input for isolating droplet
-    """
-    linePosition = True
-    cutoffPoint = None    
-    
-    #loop to find the outline coordinate where the outline coordinate is below the line
-    for i in range (0, len(interfaceCoords)):
-        linePosition = calculate_dot_product(lineCoordX, lineCoordZ,
-                                    interfaceCoords[i,0], interfaceCoords[i,1])
-        if linePosition is False:
-            cutoffPoint = i
-            break
-    
-    #self.dropcoord will be the coordinates used from now on
-    dropCoords = interfaceCoords
-    
-    #when it is found, remove all coordinates above that y-coordinate
-    j = 0
-    while j < cutoffPoint:
-        dropCoords = np.delete(dropCoords,0,0)
-        j += 1
-
-    return dropCoords
+#def isolate_drop(lineCoordX, lineCoordZ, interfaceCoords,xBot,yBot):
+#    """
+#    Checks whether point is above or below line using the calculate_cross_product 
+#    function to see if linePosition is: above (True) --> keep looping, else is 
+#    below (False) --> stop looping.
+#    
+#    lineCoordX = list - total x range (in pixels) of droplet
+#    lineCoordZ = list - z-coordinate (in pixels) of user input for isolating droplet
+#    """
+#    linePosition = True
+#    cutoffPoint = None    
+#    
+#    #rotate image
+#    xTop,yTop = interfaceCoords[0]
+#    theta = get_rotate_coords(xTop,yTop,xBot,yBot)
+#
+#    print(theta)
+#    xRotated = interfaceCoords[:,0]*np.cos(theta) - interfaceCoords[:,1]*np.sin(theta)
+#    zRotated = interfaceCoords[:,0]*np.sin(theta) + interfaceCoords[:,1]*np.cos(theta)
+#    
+#    interfaceCoords = np.column_stack((xRotated,zRotated))
+#    
+#    #loop to find the outline coordinate where the outline coordinate is below the line
+#    for i in range (0, len(interfaceCoords)):
+#        linePosition = calculate_dot_product(lineCoordX, lineCoordZ,
+#                                    interfaceCoords[i,0], interfaceCoords[i,1])
+#        if linePosition is False:
+#            cutoffPoint = i
+#            break
+#    
+#    #self.dropcoord will be the coordinates used from now on
+#    dropCoords = interfaceCoords
+#    
+#    #when it is found, remove all coordinates above that y-coordinate
+#    j = 0
+#    while j < cutoffPoint:
+#        dropCoords = np.delete(dropCoords,0,0)
+#        j += 1
+#
+#    return dropCoords
 
 def shift_coords(xCoords, zCoords, newCenter):
     """ 
@@ -191,8 +210,8 @@ def shift_coords(xCoords, zCoords, newCenter):
     zCoords -= zDifference
     
     #artifically rotate data (FOR TESTING PURPOSES)
-    xCoords = xCoords*np.cos(-5*2*np.pi/360) - zCoords*np.sin(-5*2*np.pi/360)
-    zCoords = xCoords*np.sin(-5*2*np.pi/360) + zCoords*np.cos(-5*2*np.pi/360)  
+#    xCoords = xCoords*np.cos(-5*2*np.pi/360) - zCoords*np.sin(-5*2*np.pi/360)
+#    zCoords = xCoords*np.sin(-5*2*np.pi/360) + zCoords*np.cos(-5*2*np.pi/360)  
     
     coords = np.append([xCoords],[zCoords],axis=0).transpose()
 
@@ -261,6 +280,43 @@ def reorder_data(coords):
     zCoords = np.append(zDataLeft,zDataRight[1:])
 
     return xCoords,zCoords         
+
+
+######################## Section for Laurie ##################################
+
+def get_true_vertical(slopeEdges):
+    """
+    Finds the true vertical reference (gravity) through obtaining the slope of a
+    vertically hanging string attached to a weight.
+    
+    slopeEdges - 2d array: 
+    
+    """
+    
+    return trueVerticalSlope
+    
+def get_syringe_rotation(capillaryEdges):
+    """
+    Finds the rotation angle of the syringe based off of the true vertical.
+    """
+    
+    return dropletRotationAngle
+    
+def get_rotated_droplet(dropletCoords,trueVerticalSlope,dropletRotationAngle):
+    """
+    Calibrates the droplet coordinates based off the rotation angle of the syringe
+    with respect to true vertical.
+    """
+
+    return rotatedDropletCoords
+
+def get_droplet_isloation(rotatedDropletCoords,capillaryEdges):
+    """
+    Isolates the droplet from the capillary portion of the edge profile.
+    """
+    
+    return isolatedDropletCoords
+
                
 ######################## For Testing Purposes ################################# 
    
@@ -293,8 +349,7 @@ if __name__ == "__main__":
     
     #flag3 = test for get_interface_coordinates()
     flag3 = False
-
-    
+   
     #flag5 = test for get_min_distance()
     flag5 = False
     
@@ -327,8 +382,19 @@ if __name__ == "__main__":
     if(flag2 == True):
         img = mpimg.imread('H2O in PDMS.jpg')
         binarizedImage = binarize_image(img)
-        edges = detect_boundary(binarizedImage)
-        plt.imshow(edges,cmap='gray')
+        edges,hierarchy = detect_boundary(binarizedImage)
+        newEdges = []
+        
+        for i in range(len(edges)):
+            if i == 0:
+                newEdges = np.reshape(edges[i],(-1,2))
+            else:
+                newEdges = np.vstack((newEdges,(np.reshape(edges[i],(-1,2)))))
+        
+        plt.scatter(newEdges[:,0],newEdges[:,1])
+        #y=cv2.drawContours(img,edges,-1,(0, 255, 0),-1)
+        #cv2.imshow("window title", img)
+        
         
     #flag3 = test for get_interface_coordinates()       
     if(flag3 == True):
