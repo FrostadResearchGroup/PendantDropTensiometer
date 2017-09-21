@@ -8,10 +8,11 @@ Created on Wed May 17 18:26:21 2017
 import numpy as np
 from scipy import optimize
 from scipy.integrate import ode
+from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import time
 
-def ode_system(t,y,bond):
+def ode_system(y,t,bond):
     """
     Outputs system of ordinary differential equations with non-dimensionalized
     coordinates --> f = [d(fi)/ds , d(X)/ds , d(Z)/ds].
@@ -20,8 +21,8 @@ def ode_system(t,y,bond):
     y    = float - desired solution to ODE system [fiVec, xVec, zVec]
     bond = float - Bond number
     """
-    phi, r, z = y
-    f = [2-bond*(z)-np.sin(phi)/(r), np.cos(phi), np.sin(phi)]
+    phi, r, z, V = y
+    f = [2-bond*(z)-np.sin(phi)/(r), np.cos(phi), np.sin(phi),np.pi*r**2*np.sin(phi)]
     return f
     
 def young_laplace(Bo,nPoints,L):
@@ -30,44 +31,25 @@ def young_laplace(Bo,nPoints,L):
     nPoints = int - number of integration points desired
     L       = float - final arc length for range of integration
     """
-        
-    # set solver
-    solver = ode(ode_system)
-    solver.set_integrator('dopri5')
-
-    current_s=L
-    N=nPoints
-
-    bond=Bo
     
-    #sets bond number to value inputted when ylp_func is called by solver
-    solver.set_f_params(bond)
-
+    #integration range and number of integration points
+    s1=L
+    N=nPoints 
+    
     #set initial values
     s0 = 0
-    y0 = [0.00001,0.00001,0.00001]
-    solver.set_initial_value(y0,s0)
+    y0 = [0.00001,0.00001,0.00001,0.00001]
     
-    # Create the array `t` of time values at which to compute
-    # the solution, and create an array to hold the solution.
-    # Put the initial value in the solution array.
-    s1 = current_s
-    s = np.linspace(s0, s1, N)
-    sol = np.empty((N, 3))
-    sol[0] = y0
-    
-    # Shooter rountine: repeatedly call the `integrate` method to advance the
-    # solution to time t[k], and save the solution in sol[k].
-    k = 1
-    while solver.successful() and solver.t < s1:
-        solver.integrate(s[k])
-        sol[k] = solver.y
-        k += 1
-        
+    sVec = np.linspace(s0,s1,N) 
+    bond=Bo
+   
+    sol = odeint(ode_system,y0,sVec,args=(bond,))
+
     r = sol[:,1]
     z = sol[:,2]
+    V = sol[:,3]
         
-    return r,z
+    return r,z,V
 
 
 def get_response_surf(sigma,r0,theta,deltaRho,xActual,zActual,objective_fun_v2,N=100):
@@ -125,7 +107,7 @@ def get_test_data(sigma,r0,deltaRho,N=100,L=30):
     #define Bond Number and solve Young Laplace Eqn.
     bond = deltaRho*9.81*r0**2/sigma
     
-    xData,zData = young_laplace(bond,N,L)
+    xData,zData,vData = young_laplace(bond,N,L)
     xData = xData*r0
     zData = zData*r0
     
@@ -219,7 +201,7 @@ def rotate_data(xActualLeft,zActualLeft,xActualRight,zActualRight,thetaVal):
     return xActualLeft,zActualLeft,xActualRight,zActualRight
 
 def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
-                     zDataRight,sFinal,numberPoints=1000):
+                     zDataRight,sFinal,trueRotation,numberPoints=1000):
     """
     Calculates the sum of residual error squared between x data and 
     theorectical points through a comparison of z coordinates.
@@ -232,20 +214,10 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
     #building relationship from params to bond number
     gamma = params[0]
     apexRadius = params[1]
-    theta = params[2]
     bond = deltaRho*9.81*apexRadius**2/gamma
     
-    horizApexShift = params[3]
-    vertApexShift  = params[4]
-    
-    #include horizontal and vertical apex shift
-    xDataLeft  = xDataLeft  + horizApexShift
-    xDataRight = xDataRight + horizApexShift
-    zDataLeft  = zDataLeft  + vertApexShift
-    zDataRight = zDataRight + vertApexShift
-    
     #throwing bond number into curve/coordinate generator
-    xModel,zModel = young_laplace(bond,numberPoints,sFinal)
+    xModel,zModel,vModel = young_laplace(bond,numberPoints,sFinal)
 
 
     #x and z coordinates with arc length
@@ -253,7 +225,7 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
     zModel = zModel*apexRadius
     
     #rotate data points with theta parameter
-    xDataLeft,zDataLeft,xDataRight,zDataRight = rotate_data(xDataLeft,zDataLeft,xDataRight,zDataRight,theta)
+    xDataLeft,zDataLeft,xDataRight,zDataRight = rotate_data(xDataLeft,zDataLeft,xDataRight,zDataRight,trueRotation)
     
     #creates tiling matrices for subsequent indexing of data to model comparison
     zDatagridLeft,zModelgridLeft,zDatagridRight,zModelgridRight = tiling_matrix(zDataLeft,zDataRight,zModel)
@@ -284,7 +256,7 @@ def bond_calc(xActual,zActual):
     #looking for Xe    
     xeLeft = max(abs(xDataLeft))
     xeRight = max(abs(xDataRight))
-    xeAvg = np.average((xeLeft+xeRight))/2
+    xeAvg = (xeLeft+xeRight)/2
     
     r0Guess = abs(xeRight)
     xeScal = xeAvg/r0Guess
@@ -298,7 +270,7 @@ def bond_calc(xActual,zActual):
 
     xsLeft = zDataLeft[indexLeft]
     xsRight = zDataRight[indexRight]
-
+    
     #averaging left and right values
     sLeft = xsLeft/xeLeft
     sRight = xsRight/xeRight
@@ -321,11 +293,11 @@ def s_interp(sAvg,xeAvg):
     elif sAvg >= .68:
         hInv = (.31345/sAvg**2.64267) - (.09155*sAvg**2)+(.14701**sAvg)-(.05877)
     elif sAvg >= .59:
-        hInv = (.31522/sAvg^2.62435) - (.11714*sAvg^2)+(.15756*sAvg)-(.05285)
+        hInv = (.31522/sAvg**2.62435) - (.11714*sAvg**2)+(.15756*sAvg)-(.05285)
     elif sAvg >= .46:
-        hInv = (.31968/sAvg^2.59725) - (.46898*sAvg^2)+(.50059*sAvg)-(.13261);
+        hInv = (.31968/sAvg**2.59725) - (.46898*sAvg**2)+(.50059*sAvg)-(.13261);
     elif sAvg >= .401:
-        hInv = (.32720/sAvg^2.56651) - (.97553*sAvg^2)+(.84059*sAvg)-(.18069);
+        hInv = (.32720/sAvg**2.56651) - (.97553*sAvg**2)+(.84059*sAvg)-(.18069);
     else:
         print('Shape is too spherical');
         #Use formula for S > 0.401 even though it is wrong
@@ -370,8 +342,8 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
     else:
         return sumArcRight
   
-def optimize_params(xActual,zActual,bondGuess,r0Guess,hShiftGuess,vShiftGuess,deltaRho,nReload,
-                 nPoints=1000,thetaGuess=0):
+def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,trueRotation,
+                 nPoints=1000):
     """
     Optimizes bondnumber, apex radius of curvature, and rotational angle to fit
     curve (as described through system of ODEs) to data points. Outputs fitted
@@ -393,7 +365,7 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,hShiftGuess,vShiftGuess,de
     # initial guesses to start rountine
     sigmaGuess = deltaRho*9.81*r0Guess**2/bondGuess
     r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
-    initGuess = [sigmaGuess,r0Guess,thetaGuess,hShiftGuess,vShiftGuess]
+    initGuess = [sigmaGuess,r0Guess]
 
 
     intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Guess)
@@ -401,23 +373,20 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,hShiftGuess,vShiftGuess,de
     # calling out optimization routine with reload
     for i in range(nReload):
         r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,
-                            xDataLeft,zDataLeft,xDataRight,zDataRight,intRange),
+                            xDataLeft,zDataLeft,xDataRight,zDataRight,intRange,trueRotation),
                             method='Nelder-Mead',tol=1e-9)
-        initGuess = [r.x[0],r.x[1],r.x[2]]
+        initGuess = [r.x[0],r.x[1]]
         sigmaFinal = r.x[0]
-        thetaFinal = r.x[2]
-        r0Final = r.x[1] * np.cos(thetaFinal)
+        r0Final = r.x[1] * np.cos(trueRotation)
         bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
         
-        horizShiftFinal = r.x[3]
-        vertShiftFinal  = r.x[4]
-        
         intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
-        xFit,zFit=young_laplace(bondFinal,nPoints,intRangeFinal)
+        xFit,zFit,vFit=young_laplace(bondFinal,nPoints,intRangeFinal)
         
+        dropVolume = vFit[np.argmin(abs(zFit-np.max(zActual)))]*r0Final*10**9
         
-        xActual = xActual*np.cos(thetaFinal) - zActual*np.sin(thetaFinal) + horizShiftFinal 
-        zActual = xActual*np.sin(thetaFinal) + zActual*np.cos(thetaFinal) + vertShiftFinal  
+        xActual = xActual*np.cos(trueRotation) - zActual*np.sin(trueRotation)
+        zActual = xActual*np.sin(trueRotation) + zActual*np.cos(trueRotation)    
         
         # plot values with fitted bond number and radius of curvature at apex            
         xCurveFit=xFit*r0Final
@@ -432,7 +401,7 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,hShiftGuess,vShiftGuess,de
         plt.plot(xCurveFit_App,zCurveFit_App,'b')
         plt.pause(1)
 
-    return sigmaFinal,r0Final,thetaFinal,bondFinal,horizShiftFinal,vertShiftFinal
+    return sigmaFinal,r0Final,bondFinal,dropVolume
 
 
 
@@ -448,7 +417,7 @@ if __name__ == "__main__":
     plt.close('all')
       
     # fitting based on z coordinates
-    testObjFunV2 = False
+    testObjFunV2 = True
     # importing test data for analysis
     testData = False
     # vizualization of objective function as a surface plot
@@ -456,7 +425,7 @@ if __name__ == "__main__":
     #summation arc lengh
     testArcSum = False
     #test initial Bond finder
-    testInitBond = True
+    testInitBond = False
     
     if testObjFunV2 or testData or testArcSum or testInitBond:
         # Generate test data for objective functions
@@ -483,9 +452,10 @@ if __name__ == "__main__":
         nReload = 1
         sigmaGuess = 0.05
         thetaGuess = 0
-        s,xe = bond_calc(xActual,zActual)
+        s,xe,r0Guess = bond_calc(xActual,zActual)
         bondGuess = s_interp(s,xe)  
 
+        trueRotation = 0 
         r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
         initGuess = [sigmaGuess,r0Guess,thetaGuess]
         
@@ -494,7 +464,7 @@ if __name__ == "__main__":
         # calling out optimization routine with reload
         for i in range(nReload):
             r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,
-                                xDataLeft,zDataLeft,xDataRight,zDataRight,intRange),
+                                xDataLeft,zDataLeft,xDataRight,zDataRight,intRange,trueRotation),
                                 method='Nelder-Mead',tol=1e-9)
             initGuess = [r.x[0],r.x[1],r.x[2]]
             sigmaFinal = r.x[0]            
@@ -504,14 +474,15 @@ if __name__ == "__main__":
             
             intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,
                                              zDataRight,r0Final)
-            xFit,zFit=young_laplace(bondFinal,nPoints,intRangeFinal)
+            xFit,zFit,vFit=young_laplace(bondFinal,nPoints,intRangeFinal)
             
             xFit = xFit*np.cos(-thetaFinal) - zFit*np.sin(-thetaFinal)
             zFit = xFit*np.sin(-thetaFinal) + zFit*np.cos(-thetaFinal)
-        
+            
             # plot values with fitted bond number and radius of curvature at apex            
             xCurveFit=xFit*r0Final
             zCurveFit=zFit*r0Final
+            vCurveFit=vFit*r0Final
             xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
             zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
          
