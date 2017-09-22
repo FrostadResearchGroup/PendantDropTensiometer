@@ -275,7 +275,7 @@ def bond_calc(xActual,zActual):
     sLeft = xsLeft/xeLeft
     sRight = xsRight/xeRight
     sAvg = (sLeft+sRight)/2        
-    print(sAvg)
+
     return sAvg,xeScal,r0Guess
     
 def s_interp(sAvg,xeAvg,deltaP):
@@ -332,8 +332,8 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
                     + (abs(zActualRight[1:])-abs(zActualRight[:-1]))**2)**0.5
     
     # creating a summated arclength vector 
-    sumArcLeft = np.sum(arcDistLeft)*r0Guess
-    sumArcRight = np.sum(arcDistRight)*r0Guess
+    sumArcLeft = 1.5*np.sum(arcDistLeft)/r0Guess
+    sumArcRight = 1.5*np.sum(arcDistRight)/r0Guess
      
     # return largest s value
 
@@ -410,7 +410,7 @@ if __name__ == "__main__":
     plt.close('all')
       
     # fitting based on z coordinates
-    testObjFunV2 = False
+    testObjFunV2 = True
     # importing test data for analysis
     testData = False
     # vizualization of objective function as a surface plot
@@ -418,7 +418,7 @@ if __name__ == "__main__":
     #summation arc lengh
     testArcSum = False
     #test initial Bond finder
-    testInitBond = True
+    testInitBond = False
     
     if testObjFunV2 or testData or testArcSum or testInitBond:
         # Generate test data for objective functions
@@ -443,14 +443,11 @@ if __name__ == "__main__":
               
         # initial guesses to start rountine 
         nReload = 1
-        sigmaGuess = 0.05
-        thetaGuess = 0
         s,xe,r0Guess = bond_calc(xActual,zActual)
-        bondGuess = s_interp(s,xe)  
+        sigmaGuess = s_interp(s,xe,deltaRho)  
 
         trueRotation = 0 
-        r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
-        initGuess = [sigmaGuess,r0Guess,thetaGuess]
+        initGuess = [sigmaGuess,r0Guess]
         
         intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Guess)
         
@@ -459,18 +456,14 @@ if __name__ == "__main__":
             r=optimize.minimize(objective_fun_v2,initGuess,args=(deltaRho,
                                 xDataLeft,zDataLeft,xDataRight,zDataRight,intRange,trueRotation),
                                 method='Nelder-Mead',tol=1e-9)
-            initGuess = [r.x[0],r.x[1],r.x[2]]
+            initGuess = [r.x[0],r.x[1]]
             sigmaFinal = r.x[0]            
-            thetaFinal = r.x[2]
-            r0Final = r.x[1] * np.cos(thetaFinal)
+            r0Final = r.x[1]
             bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
             
             intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,
                                              zDataRight,r0Final)
             xFit,zFit,vFit=young_laplace(bondFinal,nPoints,intRangeFinal)
-            
-            xFit = xFit*np.cos(-thetaFinal) - zFit*np.sin(-thetaFinal)
-            zFit = xFit*np.sin(-thetaFinal) + zFit*np.cos(-thetaFinal)
             
             # plot values with fitted bond number and radius of curvature at apex            
             xCurveFit=xFit*r0Final
