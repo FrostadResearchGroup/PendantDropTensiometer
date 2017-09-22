@@ -93,7 +93,7 @@ def get_response_surf(sigma,r0,theta,deltaRho,xActual,zActual,objective_fun_v2,N
     return X,Y,Z
     
     
-def get_test_data(sigma,r0,deltaRho,N=100,L=30):   
+def get_test_data(sigma,r0,deltaRho,N=1000,L=30):   
     """
     Generates drop profile data for testing purposes (can comment out pixelation section).
     
@@ -259,7 +259,7 @@ def bond_calc(xActual,zActual):
     xeAvg = (xeLeft+xeRight)/2
     
     r0Guess = abs(xeRight)
-    xeScal = xeAvg/r0Guess
+    xeScal = xeAvg
     
     #looking for Xs    
     indicesLeft = np.argmin(abs(zDataLeft-2*xeLeft))    
@@ -268,17 +268,17 @@ def bond_calc(xActual,zActual):
     indexLeft = int(np.average(indicesLeft))
     indexRight = int(np.average(indicesRight))
 
-    xsLeft = zDataLeft[indexLeft]
-    xsRight = zDataRight[indexRight]
+    xsLeft = abs(xDataLeft[indexLeft])
+    xsRight = abs(xDataRight[indexRight])
     
     #averaging left and right values
     sLeft = xsLeft/xeLeft
     sRight = xsRight/xeRight
     sAvg = (sLeft+sRight)/2        
-    
+    print(sAvg)
     return sAvg,xeScal,r0Guess
     
-def s_interp(sAvg,xeAvg):
+def s_interp(sAvg,xeAvg,deltaP):
     """
     Searches for value to interpolate for s vs 1/H, relationships as described
     by Ambwain and Fort Jr., 1979.
@@ -291,7 +291,7 @@ def s_interp(sAvg,xeAvg):
         hInv = (.30715/sAvg**2.84636) + (-.69116*sAvg**3)-(-1.08315*sAvg**2)+ \
         (-.18341*sAvg)-(.20970)
     elif sAvg >= .68:
-        hInv = (.31345/sAvg**2.64267) - (.09155*sAvg**2)+(.14701**sAvg)-(.05877)
+        hInv = (.31345/sAvg**2.64267) - (.09155*sAvg**2)+(.14701*sAvg)-(.05877)
     elif sAvg >= .59:
         hInv = (.31522/sAvg**2.62435) - (.11714*sAvg**2)+(.15756*sAvg)-(.05285)
     elif sAvg >= .46:
@@ -303,9 +303,9 @@ def s_interp(sAvg,xeAvg):
         #Use formula for S > 0.401 even though it is wrong
         hInv = (.32720/sAvg**2.56651) - (.97553*sAvg**2)+(.84059*sAvg)-(.18069);
         
-    bondGuess = -1/(4*hInv*(xeAvg)**2);
+    surfTenGuess = deltaP*9.81*(2*xeAvg)**2*hInv;
 
-    return bondGuess
+    return surfTenGuess
 
   
 def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
@@ -332,8 +332,8 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
                     + (abs(zActualRight[1:])-abs(zActualRight[:-1]))**2)**0.5
     
     # creating a summated arclength vector 
-    sumArcLeft = np.sum(arcDistLeft)/r0Guess
-    sumArcRight = np.sum(arcDistRight)/r0Guess
+    sumArcLeft = np.sum(arcDistLeft)*r0Guess
+    sumArcRight = np.sum(arcDistRight)*r0Guess
      
     # return largest s value
 
@@ -342,7 +342,7 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
     else:
         return sumArcRight
   
-def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,trueRotation,
+def optimize_params(xActual,zActual,sigmaGuess,r0Guess,deltaRho,nReload,trueRotation,
                  nPoints=1000):
     """
     Optimizes bondnumber, apex radius of curvature, and rotational angle to fit
@@ -363,10 +363,8 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,trueRotat
     xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
     
     # initial guesses to start rountine
-    sigmaGuess = deltaRho*9.81*r0Guess**2/bondGuess
-    r0Guess = (bondGuess*sigmaGuess/(deltaRho*9.81))**0.5
+#    bondGuess = deltaRho*9.81*r0Guess**2/sigmaGuess
     initGuess = [sigmaGuess,r0Guess]
-
 
     intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Guess)
     
@@ -402,14 +400,9 @@ def optimize_params(xActual,zActual,bondGuess,r0Guess,deltaRho,nReload,trueRotat
         plt.pause(1)
 
     return sigmaFinal,r0Final,bondFinal,dropVolume
-
-
-
-
-
-
-
-
+    
+    
+    
 ######################## For Testing Purposes #################################   
    
 if __name__ == "__main__":
@@ -417,7 +410,7 @@ if __name__ == "__main__":
     plt.close('all')
       
     # fitting based on z coordinates
-    testObjFunV2 = True
+    testObjFunV2 = False
     # importing test data for analysis
     testData = False
     # vizualization of objective function as a surface plot
@@ -425,7 +418,7 @@ if __name__ == "__main__":
     #summation arc lengh
     testArcSum = False
     #test initial Bond finder
-    testInitBond = False
+    testInitBond = True
     
     if testObjFunV2 or testData or testArcSum or testInitBond:
         # Generate test data for objective functions
@@ -500,8 +493,10 @@ if __name__ == "__main__":
         intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
     
     if testInitBond:
-        s,xe = bond_calc(xActual,zActual)
-        initBondGuess = s_interp(s,xe)
+        s,xe,apexRadius = bond_calc(xActual,zActual)
+        surfTenGuess = s_interp(s,xe,deltaRho)
+        bondGuess = deltaRho*9.81*apexRadius**2/surfTenGuess
+#        surfTenGuess = 9.81*xe**2*998/hInverse
 
     #update this section with new script        
     if viewObjFunSurf:
