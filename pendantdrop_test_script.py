@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 22 12:26:32 2017
-
 @author: Yohan
 """
 
@@ -17,13 +16,14 @@ from mpl_toolkits.mplot3d.axes3d import Axes3D
 import numpy as np
 import os
 
-
 ##############################################################################
 
 #input parameters  
-deltaRho = 998          #absolute density difference between two fluids in g/L
-actualDiameter = 2.108  #capillary diameter in mm
-reloads = 1             #converge 
+deltaRho = 998 #absolute density difference between two fluids in g/L
+actualDiameter = 2.108 #capillary diameter in mm
+reloads = 1 #converge 
+#unsure of true syringe rotation
+trueSyringeRotation = 0
 
 ##############################################################################
 
@@ -37,96 +37,164 @@ def display_scat(obj):
     plt.cla()
     plt.scatter(obj[:,0],obj[:,1])
     plt.pause(1)
+
+#user input to specify directory     
+dirName = tkFileDialog.askdirectory()
+
+for root,dirs,files in os.walk(dirName):
+
+    capImage = files[0]
+    capFullDirectory  = dirName+'/'+capImage
+    capFullDirectory = capFullDirectory.encode('ascii','ignore')
+    capillaryImage = ie.load_image_file(capFullDirectory)     
     
-#get image file path
-filePath = tkFileDialog.askopenfilename()
+    capillaryRotation,xCoords,zCoords = ip.get_capillary_rotation(capillaryImage)
 
-#get image from file path
-if os.path.isfile(filePath):
-    image = ie.load_image_file(filePath)
-    display_plot(image)
-    print("image loaded")
-else:
-    print("file not loaded!")
     
-#binarize image
-binarizedImage = ip.binarize_image(image)
-display_plot(binarizedImage)
-print("image binarized")
-
-#detect image boundary
-edges = ip.detect_boundary(binarizedImage)
-display_plot(edges)
-print("boundary traced")
-
-#get interface coordinates
-interfaceCoordinates = ip.get_interface_coordinates(edges)
-display_scat(interfaceCoordinates)
-print("boundary coordinates acquired")
-
-#get magnification ratio
-magnificationRatio = ip.get_magnification_ratio(interfaceCoordinates,actualDiameter)
-print ("magnification ratio is " + str(magnificationRatio))
-
-#isolate drop
-pts = plt.ginput(1)
-x,y = pts[0]
-xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
-yCoords = [y,y]
-dropCoords = ip.isolate_drop(xCoords,yCoords,interfaceCoordinates)
-print ("drop isolated")
-
-#shift coordinates so apex is at 0,0
-plt.gca().invert_yaxis()
-newCenter = [0,0]
-shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
-display_scat(shiftedCoords)
-print ("shifted apex NEAR 0,0")
-
-#scale drop
-scaledCoords = ip.scale_drop(shiftedCoords,magnificationRatio)
-print ("scaled coordinates according to magnification ratio")
-
-#reorder data points
-xData,zData = ip.reorder_data(scaledCoords)
-s,xe,apexRadiusGuess = dp.bond_calc(xData,zData)
-bondInit = dp.s_interp(s,xe)
-
-#state guesses for apex shift
-horizShiftGuess = 0
-vertShiftGuess  = 0 
-
-#run through optimization routine
-surfTen,apexRadius,thetaRotation,bondNumber,horizTranslation,vertTranslation = dp.optimize_params(xData,zData,bondInit,
-                                                      apexRadiusGuess,horizShiftGuess,
-                                                      vertShiftGuess,deltaRho,reloads)
-
-
-#output surface tension
-print "Bond Number = %.4g" %(bondNumber)
-print "Surface Tension = %.4g mN/m" %(surfTen*10**3)
-
-
-#output error surface plot
-#x,y,z = dp.get_response_surf(surfTen,apexRadius,thetaRotation,deltaRho,xData,zData,dp.objective_fun_v2)
-#ax = Axes3D(plt.figure())
-#ax.plot_surface(x,y,np.log10(z))
-
-######################## For Testing Purposes ################################# 
-   
-if __name__ == "__main__":
+    surfaceTenVec = ()
+    apexRadiusVec = ()
+    bondNumberVec = ()
+    changeDropVolVec = ()    
     
-    testProfiler = False
+    mode = input('Is this an image or time lapse? Enter 1 for image, 2 for time lapse: ')
+    numMethod = input('Algebraic or Iterative solution? Enter 1 for algebraic, 2 for iterative: ')
     
-    
-    if testProfiler:    
-    
-        #import profiler packages
-        import cProfile
-        import pstats
+    #mode for analyszing image    
+    if mode == 1:
+        dropImage = files[1]
+        dropFullDirectory  = dirName+'/'+dropImage
+        dropFullDirectory = dropFullDirectory.encode('ascii','ignore')
+        dropletImage = ie.load_image_file(dropFullDirectory) 
         
-        cProfile.run('dp.optimize_params(xData,zData,bondInit,apexRadiusGuess,horizShiftGuess,vertShiftGuess,deltaRho,reloads)','timeStats')
-        p = pstats.Stats('timeStats')
+        #binarize image
+        binarizedDropletImage = ip.binarize_image(dropletImage)
+        display_plot(binarizedDropletImage)
+        print("image binarized")
         
-        #arrange output by largest culmulative tie
-        p.sort_stats('time').print_stats(10)
+        #detect image boundary
+        dropletEdges = ip.detect_boundary(binarizedDropletImage)
+        display_plot(dropletEdges)
+        print("boundary traced")
+        
+        #get interface coordinates
+        interfaceCoordinates = ip.get_interface_coordinates(dropletEdges)
+        plt.cla()
+        plt.scatter(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
+        print("boundary coordinates acquired")
+        
+        #isolate drop
+        xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
+        dropCoords = ip.isolate_drop(xCoords,zCoords,interfaceCoordinates)
+        print ("drop isolated")
+        
+        #get magnification ratio
+        magnificationRatio = ip.get_magnification_ratio(dropCoords,actualDiameter)
+        print ("magnification ratio is " + str(magnificationRatio))
+        
+        #shift coordinates so apex is at 0,0
+        plt.gca().invert_yaxis()
+        newCenter = [0,0]
+        shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
+        display_scat(shiftedCoords)
+        print ("shifted apex to 0,0")
+        
+        #scale drop
+        scaledCoords = ip.scale_drop(shiftedCoords,magnificationRatio)
+        print ("scaled coordinates according to magnification ratio")
+        
+        #reorder data points
+        xData,zData = ip.reorder_data(scaledCoords)
+        s,xe,apexRadiusGuess = dp.bond_calc(xData,zData)
+        surfTenInit = dp.s_interp(s,xe,deltaRho)
+        if numMethod == 2:
+            #run through optimization routine
+            surfTen,apexRadius,bondNumber,dropVol = dp.optimize_params(xData,zData,surfTenInit,apexRadiusGuess,deltaRho,reloads,trueSyringeRotation)
+            
+            #output surface tension
+            print "Bond Number = %.4g" %(bondNumber)
+            print "Surface Tension = %.4g mN/m" %(surfTen*10**3)
+        elif numMethod == 1:
+            print "Surface Tension = %.4g mN/m" %(surfTenInit*10**3)
+        else:
+            print('Invalid Mode Selected! Re-Run Script and Enter 1 or 2')
+    #mode for analyszing time lapse       
+    elif mode == 2:
+        for i in range(len(files)-2):
+            if i != len(files)-1:
+                
+                dropImage = files[i+1]
+                dropFullDirectory  = dirName+'/'+dropImage
+                dropFullDirectory = dropFullDirectory.encode('ascii','ignore')
+                dropletImage = ie.load_image_file(dropFullDirectory) 
+                
+                #binarize image
+                binarizedDropletImage = ip.binarize_image(dropletImage)
+                display_plot(binarizedDropletImage)
+                print("image binarized")
+                
+                #detect image boundary
+                dropletEdges = ip.detect_boundary(binarizedDropletImage)
+                display_plot(dropletEdges)
+                print("boundary traced")
+                
+                #get interface coordinates
+                interfaceCoordinates = ip.get_interface_coordinates(dropletEdges)
+                plt.cla()
+                plt.scatter(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
+                print("boundary coordinates acquired")
+                
+                #isolate drop
+                xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
+                dropCoords = ip.isolate_drop(xCoords,zCoords,interfaceCoordinates)
+                print ("drop isolated")
+                
+                #get magnification ratio
+                magnificationRatio = ip.get_magnification_ratio(dropCoords,actualDiameter)
+                print ("magnification ratio is " + str(magnificationRatio))
+                
+                #shift coordinates so apex is at 0,0
+                plt.gca().invert_yaxis()
+                newCenter = [0,0]
+                shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
+                display_scat(shiftedCoords)
+                print ("shifted apex to 0,0")
+                
+                #scale drop
+                scaledCoords = ip.scale_drop(shiftedCoords,magnificationRatio)
+                print ("scaled coordinates according to magnification ratio")
+                
+                #reorder data points
+                xData,zData = ip.reorder_data(scaledCoords)
+                s,xe,apexRadiusGuess = dp.bond_calc(xData,zData)
+                surfTenInit = dp.s_interp(s,xe,deltaRho)
+                if numMethod == 2:
+                    #run through optimization routine
+                    surfTen,apexRadius,bondNumber,dropVol = dp.optimize_params(xData,zData,surfTenInit,apexRadiusGuess,deltaRho,reloads,trueSyringeRotation)
+                    
+                    #express dropletVolume in comparison to initial 
+                    if i == 0:
+                        initialDropVol = dropVol
+                        changeDropVol  = 1
+                    else:
+                        changeDropVol = dropVol/initialDropVol
+                    #output surface tension
+                    print "Bond Number = %.4g" %(bondNumber)
+                    print "Surface Tension = %.4g mN/m" %(surfTen*10**3)
+                    
+                    #output in vector format
+                    surfaceTenVec = np.append(surfaceTenVec,surfTen)
+                    apexRadiusVec = np.append(apexRadiusVec,apexRadius)
+                    bondNumberVec = np.append(bondNumberVec,bondNumber)
+                    changeDropVolVec = np.append(changeDropVolVec,changeDropVol)
+                    
+                elif numMethod == 1:
+                    print "Surface Tension = %.4g mN/m" %(surfTenInit*10**3)
+                    #output in vector format
+                    surfaceTenVec = np.append(surfaceTenVec,surfTenInit)
+                else:
+                    print('Invalid Mode Selected! Re-Run Script and Enter 1 or 2')
+
+ 
+    else:
+        print('Invalid Mode Selected! Re-Run Script and Enter 1 or 2')
+        
