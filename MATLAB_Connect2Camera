@@ -1,0 +1,40 @@
+function vid = Connect2Camera(CameraNum,CameraPosition)
+% position is either 'side' or 'top'
+
+vid = videoinput('winvideo', CameraNum); %'RGB32_2448x2048'
+src = getselectedsource(vid);
+
+vid.FramesPerTrigger = 1;
+if strcmp(CameraPosition,'side')
+% SET CAMERA PAREAMETERS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+src.Gamma = 152; % 0 to 1000
+vid.ReturnedColorspace = 'rgb'; % or = 'grayscale';
+%src.WhiteBalanceMode = 'manual';
+%src.WhiteBalance= 0; %0 to 10000
+src.GainMode = 'auto';
+%src.Gain= 0; % 0 to 100 
+src.ExposureMode = 'auto';
+%src.Exposure= -6; %-13 to -3
+src.ContrastMode = 'auto';
+%src.Contrast= 50; %0 to 100 
+src.BacklightCompensation = 'on'; %off or on
+vid.LoggingMode = 'memory'; %or disk
+vid.ROIPosition = [100 100 2460 1820]; %for the camera two required  
+% vid.ROIPosition = [100 0 924 768]; %for the camera two required
+else
+ src.Gamma = 152; % 0 to 1000
+vid.ReturnedColorspace = 'rgb'; % or = 'grayscale';
+src.WhiteBalanceMode = 'manual';
+src.WhiteBalance= 0; %0 to 10000
+src.GainMode = 'manual';
+src.Gain= 0; % 0 to 100 
+src.ExposureMode = 'manual';
+src.Exposure= -4; %-13 to -3
+src.ContrastMode = 'manual';
+src.Contrast= 50; %0 to 100 
+src.BacklightCompensation = 'on'; %off or on
+vid.LoggingMode = 'memory'; %or disk
+vid.ROIPosition = [100 100 1636 1116]; %for the camera two required   
+%[0 0 1936 1216]
+end
