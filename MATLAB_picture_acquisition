@@ -1,0 +1,44 @@
+
+clear all; close all; clc;
+
+totalTime = 60*10; % Time in seconds
+period = 10; % NOTE: cannot go below 1.5s and value is approximate
+CameraNum = 1;
+
+% Parse imput parameters
+N = ceil(totalTime/period); 
+period = period - 1.5;
+% Initialize
+vid = Connect2Camera(CameraNum,'side');
+t=zeros(1,N); %initializing time vector
+
+%user required to push enter to continue, getting reference image of
+%capillary
+fprintf('Please put capillary tip in focus and press "Enter" to take first image.')
+preview(vid)
+pause
+
+
+start(vid)
+%take image
+img = getdata(vid);
+stop(vid);
+imwrite(img,'CapillaryImage.jpg')
+
+%user required to push enter to continue
+fprintf('Please create droplet and press "Enter" to start time lapse.')
+pause
+closepreview
+
+tic
+for i = 1:N
+    start(vid)
+    %take image
+    img = getdata(vid);
+    t(i)=toc;
+    stop(vid);
+       
+    currentFile = sprintf('TestImage%d.jpg',i);
+    imwrite(img,currentFile)
+    pause(period)
+end
