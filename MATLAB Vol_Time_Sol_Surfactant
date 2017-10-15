@@ -3,29 +3,22 @@
 %con_id= user input to define what concentration of surfactant using
 
 %entering inputs for droplets
-surfactant= input('Please enter surfactant')
-base_path = 'C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing';
-mkdir(char(base_path) + "\" + char(surfactant));
+surfactant= input('Please enter surfactant  ', 's');
+base_path = 'C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing' ; 
+mkdir('C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing\',char(surfactant));
+current_folder= strcat('C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing\',char(surfactant));
+cd (current_folder);
 
-for i= 1:J
-    J= 1+ J ;
-    decision_for_loop= input('Continue? Enter Y or N.');
-while decision_for_loop== Y;
-   con_id= input('Please enter number for surfactant concentration in mM  ','s'); 
-   droplet_number = 'D_' + num2str(i);
-   droplet_fname= 'H20_air_' + str(surfactant) + '_' + '00' + num2str(con_id) + num2str(droplet_number);
-%con_fname = num2str(con_id) +"mM";
-%base_path = 'C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing\SDS';
-%mkdir(char(base_path),char(con_fname));
-%conc_folder = base_path + "\" + con_fname;
-
-%intializing loop to repeat for 3 droplets
-%for i = 1:3
-    %droplet_fname= 'drop' + num2str(i);
-    %droplet_fname = strcat('drop',num2str(i));
-    %mkdir(char(conc_folder), char(droplet_fname));
-
-    clear all; close all; clc;
+for decision_for_loop= input('Continue? Enter Y or N.  ' , 's');
+    decision= decision_for_loop;
+while decision== 'Y'
+   con_id= input('Please enter number for surfactant concentration in mM. If finished with test, press ctrl+c.  ','s'); 
+   drop_id= input('Please enter droplet number ','s');
+   droplet_number = strcat('_D_',drop_id);
+   %droplet_fname= strcat('H20_air_',surfactant,'_','C00',con_id,droplet_number);
+   pause(1);
+   
+    clc;
 
     totalTime = 5*1.5; % Time in seconds
     period = 1.5 ; % NOTE: cannot go below 1.5s and value is approximate
@@ -52,15 +45,16 @@ while decision_for_loop== Y;
     %take image
     img = getdata(vid);
     stop(vid);
-    imwrite(img,'CapillaryImage.jpg')
+    conversion_step= num2str(i);
+    capillary_name= strcat('CapillaryImage','_',conversion_step,'.png');
+    imwrite(img,capillary_name);
 
     %user required to push enter to continue
     fprintf('Please create droplet and immediately press "Enter" to start time delay and time lapse.')
     pause
     closepreview
-    pause(15)
+    pause(1)
 
-    droplet_file_name = droplet_f_name + 'I_' + num2str(N);
     tic
     for j = 1:N
         start(vid)
@@ -68,13 +62,16 @@ while decision_for_loop== Y;
         img = getdata(vid);
         t(j)=toc;
         stop(vid);
-
+        
+        index_conversion= num2str(j);
+        droplet_file_name = strcat('H20_air_',surfactant,'_','C00',con_id,droplet_number,'_I_',index_conversion,'_.png');
         currentFile = sprintf(droplet_file_name,j);
         imwrite(img,currentFile)
         pause(period)
     end
-
-    csvwrite('timeVector.csv',t(1:N-1))
+    
+    naming_time_vector= strcat('timeVector','_',conversion_step,'.csv');
+    csvwrite(naming_time_vector,t(1:N-1))
 
     % Close camera
     clear vid
