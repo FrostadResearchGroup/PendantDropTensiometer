@@ -1,5 +1,7 @@
 %function Volume_vs_Time() for surface tension isotherms
 %ensure you're in SDS folder before beginning
+%con_id= user input to define what concentration of surfactant using
+
 con_id= input('Please enter number for surfactant concentration in mM  ','s'); 
 con_fname = num2str(con_id) +"mM";
 base_path = 'C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing\SDS';
@@ -41,7 +43,7 @@ for i = 1:3
     imwrite(img,'CapillaryImage.jpg')
 
     %user required to push enter to continue
-    fprintf('Please create droplet and press immediately  "Enter" to start time delay and time lapse.')
+    fprintf('Please create droplet and immediately press "Enter" to start time delay and time lapse.')
     pause
     closepreview
     pause(1)
