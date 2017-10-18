@@ -5,10 +5,16 @@ Created on Wed May 17 18:26:21 2017
 @author: vanessaebogan
 """
 
+# Custom modules
+import image_extraction as ie
+import image_processing as ip
+
+# Python modules
 import numpy as np
 from scipy import optimize
 from scipy.integrate import ode
 from scipy.integrate import odeint
+
 import matplotlib.pyplot as plt
 import time
 
@@ -386,22 +392,82 @@ def optimize_params(xActual,zActual,sigmaGuess,r0Guess,deltaRho,nReload,trueRota
         xActual = xActual*np.cos(trueRotation) - zActual*np.sin(trueRotation)
         zActual = xActual*np.sin(trueRotation) + zActual*np.cos(trueRotation)    
         
-        # plot values with fitted bond number and radius of curvature at apex            
-        xCurveFit=xFit*r0Final
-        zCurveFit=zFit*r0Final
-        xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
-        zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
-     
-    
-        plt.figure()
-        plt.plot(xActual,zActual,'ro')
-        plt.axis('equal')
-        plt.plot(xCurveFit_App,zCurveFit_App,'b')
-        plt.pause(1)
+#        # plot values with fitted bond number and radius of curvature at apex            
+#        xCurveFit=xFit*r0Final
+#        zCurveFit=zFit*r0Final
+#        xCurveFit_App=np.append(list(reversed(-xCurveFit)),xCurveFit[1:])
+#        zCurveFit_App=np.append(list(reversed(zCurveFit)),zCurveFit[1:])       
+#     
+#    
+#        plt.figure()
+#        plt.plot(xActual,zActual,'ro')
+#        plt.axis('equal')
+#        plt.plot(xCurveFit_App,zCurveFit_App,'b')
+#        plt.pause(1)
 
     return sigmaFinal,r0Final,bondFinal,dropVolume
     
+def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter, 
+                     numMethod, trueSyringeRotation, reloads):
+
+    #binarize image
+    binarizedImage = ip.binarize_image(image)    
+    #get interface coordinates
+    interfaceCoordinates = ip.get_interface_coordinates(binarizedImage)
+    interfaceCoordinates = np.array(interfaceCoordinates)
+    #flip the coordinates vertically
+    interfaceCoordinates *= [1,-1]
     
+    #offset vertical points     
+    zOffset = -min(interfaceCoordinates[:,1])
+    interfaceCoordinates = interfaceCoordinates + [0,zOffset]
+    
+    # Process capillary image    
+    capillaryRotation,zCoords = ip.get_capillary_rotation(capillaryImage,zOffset)        
+    
+      
+    #isolate drop
+    xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
+    dropCoords = ip.isolate_drop(xCoords,zCoords,interfaceCoordinates)
+    
+    #plt.plot(dropCoords[:,0],dropCoords[:,1])     
+    #get magnification ratio
+    magRatio = ip.get_magnification_ratio(dropCoords, capillaryDiameter,
+                                          capillaryRotation)
+    print(magRatio)
+    
+    #shift coordinates so apex is at 0,0
+    newCenter = [0,0]
+    shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
+    
+    #scale drop
+    scaledCoords = ip.scale_drop(shiftedCoords,magRatio)
+    
+    plt.plot(scaledCoords[:,0],scaledCoords[:,1])
+    #reorder data points and estimate surface tension using 5 point method
+    xData,zData = ip.reorder_data(scaledCoords)
+    s,xe,apexRadiusGuess = bond_calc(xData,zData)
+    surfTen = s_interp(s,xe,deltaRho)
+    dropVol = 1 # MUST CALCULATE THIS SEPARATELY!!!!!!!!!!!!!!!!!!
+    
+    if numMethod == 2: # use all points
+        #run through optimization routine
+        surfTen,apexRadius,bondNumber,dropVol = optimize_params(xData,zData,
+                                                                surfTen,
+                                                                apexRadiusGuess,
+                                                                deltaRho,
+                                                                reloads,
+                                                                trueSyringeRotation)
+        
+        #express dropletVolume in comparison to initial 
+        if i == 0:
+            initialDropVol = dropVol
+            dropVol  = 1
+        else:
+            dropVol = dropVol/initialDropVol
+        
+    return surfTen, dropVol
+
     
 ######################## For Testing Purposes #################################   
    
