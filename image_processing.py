@@ -9,6 +9,8 @@ import cv2
 import numpy as np
 import data_processing as dp
 import image_extraction as ie
+import matplotlib.pyplot as plt
+import glob
 
 def binarize_image(image):
     """
@@ -22,9 +24,9 @@ def binarize_image(image):
     #rotate image 90 degrees for camera tilted 90 degrees (better aspect ratio)
     image = image.transpose()  
     
-    blur = cv2.GaussianBlur(image,(5,5),0)
-    ret3,binaryImage = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    
+#    image = cv2.GaussianBlur(image,(5,5),0)
+    ret3,image = cv2.threshold(image,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    binaryImage = (255-image)    
     
     return binaryImage
 
@@ -40,7 +42,7 @@ def detect_boundary(binaryImage):
     
     return edges
     
-def get_interface_coordinates(edges):
+def get_interface_coordinates_old(edges):
     """
     Goes through each pixel in the edges image to extract the coordinates of 
     the edges.
@@ -66,6 +68,22 @@ def get_interface_coordinates(edges):
         if(len(edgeCoords)==1):
             interfaceCoords = interfaceCoords + [edgeCoords[0]]      
     interfaceCoords = np.array(interfaceCoords)
+    
+    return interfaceCoords
+    
+def get_interface_coordinates(binaryImage):
+    """
+    Goes through each pixel in the edges image to extract the coordinates of 
+    the edges.
+    
+    binaryImage = black and white image
+    """
+    contours = cv2.findContours(binaryImage,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)[0]
+    
+    data1 = max(contours,key=len)
+#    data2 = max(contours,key=cv2.contourArea)
+    data = data1.squeeze()
+    interfaceCoords = np.reshape(data,(-1,2))
     
     return interfaceCoords
     
@@ -150,6 +168,8 @@ def calculate_dot_product(vectEndX, vectEndZ, pointCoordX, pointCoordZ):
     #below the line
     xp = (vectEndX[1]-vectEndX[0])*(pointCoordZ-vectEndZ)- \
                     (vectEndZ-vectEndZ)*(pointCoordX-vectEndX[0])
+                    
+    print(xp)
     if xp < 0:
         return True
     else:
@@ -168,24 +188,33 @@ def isolate_drop(lineCoordX, lineCoordZ, interfaceCoords):
     cutoffPoint = None        
     
     #give extra room for cutoff of droplet (view 7/8ths of droplet)
-    zCutOff = lineCoordZ + (max(interfaceCoords[:,1])-lineCoordZ)*(1/8)    
+    zCutOff = lineCoordZ - lineCoordZ/8    
+    print(zCutOff)
+  
+##    #loop to find the outline coordinate where the outline coordinate is below the line
+#    for i in range (0, len(interfaceCoords)):
+#        linePosition = calculate_dot_product(lineCoordX, zCutOff,
+#                                    interfaceCoords[i,0], interfaceCoords[i,1])
+#        if linePosition is False:
+#            cutoffPoint = i
+#            break
+#    
+#
+#    print(type(dropCoords[0]))   
+##    print(len(interfaceCoords[:,0])-1)    
+##    for i in range(len(interfaceCoords[:,0])-1):
+##        
+##        if interfaceCoords[i,1] > zCutOff:
+##            
+##            interfaceCoords = np.delete(interfaceCoords,i,axis=0)
+#    
+#    #when it is found, remove all coordinates above that y-coordinate
+#    j = 0
+#    while j < cutoffPoint:
+#        dropCoords = np.delete(dropCoords,0,0)
+#        j += 1
     
-    #loop to find the outline coordinate where the outline coordinate is below the line
-    for i in range (0, len(interfaceCoords)):
-        linePosition = calculate_dot_product(lineCoordX, zCutOff,
-                                    interfaceCoords[i,0], interfaceCoords[i,1])
-        if linePosition is False:
-            cutoffPoint = i
-            break
-    
-    #self.dropcoord will be the coordinates used from now on
-    dropCoords = interfaceCoords
-    
-    #when it is found, remove all coordinates above that y-coordinate
-    j = 0
-    while j < cutoffPoint:
-        dropCoords = np.delete(dropCoords,0,0)
-        j += 1
+    dropCoords = interfaceCoords[np.where(interfaceCoords[:,1] < zCutOff)]
 
     return dropCoords
 
@@ -205,9 +234,12 @@ def shift_coords(xCoords, zCoords, newCenter):
 #    xOffset =  xCoords[apexIndex]
 #    zOffset =  zCoords[apexIndex]    
     
+    
+    
     #determine offset of current droplet center
     xOffset =  (max(xCoords) + min(xCoords))/2
-    zOffset =   zCoords[-1]
+    zOffset =   min(zCoords)
+
     oldCenter = [xOffset,zOffset]
     
     #centers the drop
@@ -215,11 +247,11 @@ def shift_coords(xCoords, zCoords, newCenter):
     zDifference = oldCenter[1] - newCenter[1]
     xCoords -= xDifference
     zCoords -= zDifference 
-    
+   
     coords = np.append([xCoords],[zCoords],axis=0).transpose()
 
-    #flip the coordinates vertically
-    coords *= [1,-1]
+#    #flip the coordinates vertically
+    coords *= [-1,1]
     
     return coords
     
@@ -285,58 +317,6 @@ def reorder_data(coords):
     return xCoords,zCoords         
 
 
-######################## Section for Laurie ##################################
-
-#def get_true_syringe_rotation(imageFile):
-#    """
-#    Finds the rotation angle of the syringe based off of the true vertical.
-#    
-#    capillaryCoords = 2D array (from get_string_interface_coordinates)
-#    trueVerticalSlope = float (from get_true_vertical)
-#    
-#    """
-#
-#    
-#    return trueSyringeRotationAngle
-#
-#def get_string_interface_coordinates(stringEdges):
-#    """
-#    Goes through each pixel in the edges image to extract the coordinates of 
-#    the edges.
-#    
-#    stringEdges = boolean - edge profile of string (fishing line), where "True"
-#    indicates presence of edge, false indicates no edge
-#    """
-#    #creates array of edge coordinates with respect to pixel length
-#    stringCoords = []
-#    for y in range(0,stringEdges.shape[0]):
-#        edgeCoords = []
-#        for x in range(0, edges.shape[1]): 
-#            if stringEdges[y, x] != 0:
-#                edgeCoords = edgeCoords + [[x, y]]
-#
-#        for i in range(len(edgeCoords)):
-#            stringCoords = stringCoords + [edgeCoords[i]]
-#
-#    stringCoords = np.array(stringCoords)
-#    #rotationMatrix = np.array([[np.cos(np.pi*.5),-np.sin(np.pi*.5)],[np.sin(np.pi*.5),np.cos(np.pi*.5)]])
-#    #stringCoords = np.mat(stringCoords) * np.mat(rotationMatrix)                
-#                        
-#    return stringCoords
-# 
-#
-#   
-#def get_capillary_interface_coordinates(capillaryEdges):
-#    """
-#    Goes through each pixel in the edges image to extract the coordinates of 
-#    the edges.
-#    
-#    capillaryEdges = boolean - edge profile of capillary     
-#    """
-#    
-#    return capillaryCoords
-#
-
 def get_true_vertical(imageFile):
     """
     Finds the true vertical reference (gravity) through obtaining the rotational offset 
@@ -358,6 +338,7 @@ def get_true_vertical(imageFile):
     interfaceCoordinates = get_interface_calibration_coordinates(edges)
     interfaceCoordinates *= [1,-1]
     
+    
     y1 = interfaceCoordinates[0][1]
     x1 = interfaceCoordinates[0][0]
     
@@ -370,7 +351,7 @@ def get_true_vertical(imageFile):
     return trueVerticalRotationAngle
 
 
-def get_capillary_rotation(capillaryImage):
+def get_capillary_rotation(capillaryImage,zTranslate):
     """
     Finds the rotation angle of the capillary with respect to the camera position
     **return slope in degrees (rotational angle)
@@ -378,34 +359,39 @@ def get_capillary_rotation(capillaryImage):
     capillaryCoords = 2D array (from get_string_interface_coordinates)
     """  
     
+
     #binarize image of capillary
     binarizedImage = binarize_image(capillaryImage)
-    #capture edge profile of fishing line
-    edges = detect_boundary(binarizedImage)
-    
     slope = ()
     
     #create coordinate mapping of profile
-    interfaceCoordinates = get_interface_calibration_coordinates(edges)
+    interfaceCoordinates = get_interface_coordinates(binarizedImage)
     interfaceCoordinates *= [1,-1]
-    for i in range(len(interfaceCoordinates)-1):
+    
+    interfaceCoordinates = interfaceCoordinates + [0,zTranslate]
+    
+#    plt.plot(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
+    for i in range(len(interfaceCoordinates)-2):
         #average slope right here!
-        z1 = interfaceCoordinates[i][1]
-        x1 = interfaceCoordinates[i][0]
+        z1 = interfaceCoordinates[i+1][1]
+        x1 = interfaceCoordinates[i+1][0]
         
-        z2 = interfaceCoordinates[i+1][1]
-        x2 = interfaceCoordinates[i+1][0]   
+        z2 = interfaceCoordinates[i+2][1]
+        x2 = interfaceCoordinates[i+2][0]   
         
         slope = np.append(slope,(x1-x2)/(z1-z2))
-        
+    
+    
     averageSlope = np.average(slope)
     trueVerticalRotationAngle = (np.tan(averageSlope))*np.pi/180
     
-    return trueVerticalRotationAngle,x2,-z2 
+    capCutOff = min(interfaceCoordinates[:,1])
+
+    return trueVerticalRotationAngle,capCutOff
     
     
     
-    
+   
 def get_true_syringe_rotation(capillaryRotationAngle,trueVerticalSlope):
     """
     Finds the rotation angle of the syringe based off of the true vertical.
@@ -414,11 +400,7 @@ def get_true_syringe_rotation(capillaryRotationAngle,trueVerticalSlope):
     trueVerticalSlope = float (from get_true_vertical)
     
     """
-    
-    
     return trueSyringeRotationAngle
-    
-    
     
     
 def get_rotated_droplet(dropletCoords,rotOffset):
@@ -429,6 +411,7 @@ def get_rotated_droplet(dropletCoords,rotOffset):
 
     rotMatrix = np.array([[np.cos(rotOffset),-np.sin(rotOffset)],[np.cos(rotOffset),-np.sin(rotOffset)]])
     rotatedDropletCoords = np.mat(dropletCoords)*np.mat(rotMatrix)    
+    
     
     return rotatedDropletCoords
 
@@ -450,7 +433,12 @@ if __name__ == "__main__":
     xActual,zActual = dp.get_test_data(sigma,r0,deltaRho,nPoints,L)
     testArray = np.append([xActual],[zActual],axis=0).transpose()    
     
-    
+    folderName = 'Code Testing' # Must be located in Data folder
+    # Parse user inputs
+    dirName = '../Data/' + folderName + '/' 
+    fileList = glob.glob(dirName + '*0*.jpg')
+    capillaryImage = ie.load_image_file(dirName + 'CapillaryImage.jpg')
+    dropImage = fileList[0]
     
     #test flags: change to True when testing specific functions
     
@@ -553,6 +541,12 @@ if __name__ == "__main__":
         testDropCoords = isolate_drop(testLineX,testLineY,interfaceCoordinates)
         print testDropCoords
         plt.scatter(testDropCoords[:,0],testDropCoords[:,1])
+        
+        #binarize image
+        binarizedImage = ip.binarize_image(image)    
+        #get interface coordinates
+        interfaceCoordinates = ip.get_interface_coordinates(binarizedImage)
+        interfaceCoordinates = np.array(interfaceCoordinates)
         
     #flag9: test ofr shift_coords
     if(flag9 == True):
