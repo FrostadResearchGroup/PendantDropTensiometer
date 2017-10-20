@@ -1,21 +1,33 @@
 %function Volume_vs_Time() for surface tension isotherms
-%ensure you're in SDS folder before beginning
-%con_id= user input to define what concentration of surfactant using
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%user inputs
 %entering inputs for droplets
-surfactant= input('Please enter surfactant  ', 's');
-base_path = 'C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing' ; 
-mkdir('C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing\',char(surfactant));
-current_folder= strcat('C:\Research\Pendant Drop\PendantDropTensiometer-master\Soluble Surfactant Testing\',char(surfactant));
+fluid_name= 'H2O' ;          %fluid medium, or pure fluid ID
+date= 'Oct19th';            %date- no space before number!
+surfactant_name= 'HTAB'      %change for new surfactant
+concentration= 'C=0000mM';   %change for each new concentration
+directory_name_addition= strcat(char(surfactant_name),'\',char(date)); %change variable inside first char command if not surfactant
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%making file folders in Data folder in research directory
+mkdir('C:\Research\Pendant Drop\Data\',char(directory_name_addition));
+current_folder= strcat('C:\Research\Pendant Drop\Data\',char(directory_name_addition));
 cd (current_folder);
 
-for decision_for_loop= input('Continue? Enter Y or N.  ' , 's');
-    decision= decision_for_loop;
-while decision== 'Y'
-   con_id= input('Please enter number for surfactant concentration in mM. If finished with test, press ctrl+c.  ','s'); 
-   drop_id= input('Please enter droplet number ','s');
-   droplet_number = strcat('_D_',drop_id);
-   %droplet_fname= strcat('H20_air_',surfactant,'_','C00',con_id,droplet_number);
+%fluid identification
+interface_identification= input('Does this fluid contain surfactant in H2O? Enter Y or N.','s');
+
+
+for decision_for_loop= input('Continue? Enter Y or N.  ' , 's')
+    %decision= decision_for_loop;
+while decision_for_loop== 'Y'
+   %con_id= input('Please enter number for surfactant concentration in mM. If finished with test, press ctrl+c.  ','s'); 
+   %interface_identification= input('Does this fluid contain surfactant in H2O? Enter Y or N.','s');
+   drop_id= input('Please enter droplet number or press control+c to end program. ','s');
+   droplet_number = strcat('D000',drop_id);
    pause(1);
    
     clc;
@@ -32,25 +44,36 @@ while decision== 'Y'
     t=zeros(1,N); %initializing time vector
 
     %user input for naming folder    
+    user_input_image_1= input('Take new image of capillary? Enter Y or N.', 's');
+    if user_input_image_1 == 'Y'
+        %user required to push enter to continue, getting reference image of capillary
+        fprintf('Please put capillary tip in focus and press "Enter" to take first image.')
+        preview(vid)
+        pause
+        start(vid)
+        %take image
+        img = getdata(vid);
+        stop(vid);
+        conversion_step= num2str(i);
+        capillary_name= strcat('CapillaryImage','.jpg');
+        imwrite(img,capillary_name);
+        
+    else 
+    end 
 
-
-    %user required to push enter to continue, getting reference image of
-    %capillary
-    fprintf('Please put capillary tip in focus and press "Enter" to take first image.')
-    preview(vid)
-    pause
-
-
-    start(vid)
-    %take image
-    img = getdata(vid);
-    stop(vid);
-    conversion_step= num2str(i);
-    capillary_name= strcat('CapillaryImage','_',conversion_step,'.png');
-    imwrite(img,capillary_name);
+    %old code- kept just in case
+%     start(vid)
+%     %take image
+%     img = getdata(vid);
+%     stop(vid);
+%     conversion_step= num2str(i);
+%     capillary_name= strcat('CapillaryImage','_',conversion_step,'.png');
+%     imwrite(img,capillary_name);
 
     %user required to push enter to continue
+    closepreview
     fprintf('Please create droplet and immediately press "Enter" to start time delay and time lapse.')
+    preview(vid);
     pause
     closepreview
     pause(1)
@@ -64,10 +87,19 @@ while decision== 'Y'
         stop(vid);
         
         index_conversion= num2str(j);
-        droplet_file_name = strcat('H20_air_',surfactant,'_','C00',con_id,droplet_number,'_I_',index_conversion,'_.png');
-        currentFile = sprintf(droplet_file_name,j);
-        imwrite(img,currentFile)
-        pause(period)
+        
+        if interface_identification == 'Y'
+            droplet_file_name = strcat(fluid_name,'_','air','_',surfactant_name,'_',concentration,'_',droplet_number,'_','I#000',index_conversion,'_',date,'.jpg');
+        %droplet_file_name = strcat(fluid_name,'_air_',surfactant,'_',concentration, con_id,droplet_number,'_I000',index_conversion,'_.jpg');
+            currentFile = sprintf(droplet_file_name,j);
+            imwrite(img,currentFile)
+            pause(period)
+        else 
+            droplet_file_name = strcat(fluid_name,'_','air','_',droplet_number,'_','I#000',index_conversion,'_',date,'.jpg');
+            currentFile = sprintf(droplet_file_name,j);
+            imwrite(img,currentFile);
+            pause(period)
+        end 
     end
     
     naming_time_vector= strcat('timeVector','_',conversion_step,'.csv');
