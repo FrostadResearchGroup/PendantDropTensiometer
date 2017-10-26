@@ -27,7 +27,7 @@ def ode_system(y,t,bond):
     y    = float - desired solution to ODE system [fiVec, xVec, zVec]
     bond = float - Bond number
     """
-    phi, r, z, V = y
+    phi, r, z = y
     f = [2-bond*(z)-np.sin(phi)/(r), np.cos(phi), np.sin(phi),np.pi*r**2*np.sin(phi)]
     return f
     
@@ -44,7 +44,7 @@ def young_laplace(Bo,nPoints,L):
     
     #set initial values
     s0 = 0
-    y0 = [0.00001,0.00001,0.00001,0.00001]
+    y0 = [0.00001,0.00001,0.00001]
     
     sVec = np.linspace(s0,s1,N) 
     bond=Bo
@@ -53,9 +53,9 @@ def young_laplace(Bo,nPoints,L):
 
     r = sol[:,1]
     z = sol[:,2]
-    V = sol[:,3]
+    fi = sol[:,0]
         
-    return r,z,V
+    return r,z,fi
 
 
 def get_response_surf(sigma,r0,theta,deltaRho,xActual,zActual,objective_fun_v2,N=100):
@@ -113,7 +113,7 @@ def get_test_data(sigma,r0,deltaRho,N=1000,L=30):
     #define Bond Number and solve Young Laplace Eqn.
     bond = deltaRho*9.81*r0**2/sigma
     
-    xData,zData,vData = young_laplace(bond,N,L)
+    xData,zData,fiData = young_laplace(bond,N,L)
     xData = xData*r0
     zData = zData*r0
     
@@ -223,7 +223,7 @@ def objective_fun_v2(params,deltaRho,xDataLeft,zDataLeft,xDataRight,
     bond = deltaRho*9.81*apexRadius**2/gamma
     
     #throwing bond number into curve/coordinate generator
-    xModel,zModel,vModel = young_laplace(bond,numberPoints,sFinal)
+    xModel,zModel,fiModel = young_laplace(bond,numberPoints,sFinal)
 
 
     #x and z coordinates with arc length
@@ -344,9 +344,9 @@ def get_data_arc_len(xActualLeft,zActualLeft,xActualRight,zActualRight,r0Guess):
     # return largest s value
 
     if sumArcLeft > sumArcRight:            
-        return sumArcLeft
+        return sumArcLeft,arcDistLeft
     else:
-        return sumArcRight
+        return sumArcRight,arcDistRight
   
 def optimize_params(xActual,zActual,sigmaGuess,r0Guess,deltaRho,nReload,trueRotation,
                  nPoints=1000):
@@ -372,7 +372,7 @@ def optimize_params(xActual,zActual,sigmaGuess,r0Guess,deltaRho,nReload,trueRota
 #    bondGuess = deltaRho*9.81*r0Guess**2/sigmaGuess
     initGuess = [sigmaGuess,r0Guess]
 
-    intRange = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Guess)
+    intRange,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Guess)
     
     # calling out optimization routine with reload
     for i in range(nReload):
@@ -384,10 +384,10 @@ def optimize_params(xActual,zActual,sigmaGuess,r0Guess,deltaRho,nReload,trueRota
         r0Final = r.x[1] * np.cos(trueRotation)
         bondFinal=deltaRho*9.81*r0Final**2/sigmaFinal
         
-        intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
-        xFit,zFit,vFit=young_laplace(bondFinal,nPoints,intRangeFinal)
+        intRangeFinal,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0Final)
+        xFit,zFit,fiFit = young_laplace(bondFinal,nPoints,intRangeFinal)
         
-        dropVolume = vFit[np.argmin(abs(zFit-np.max(zActual)))]*r0Final*10**9
+#        dropVolume = vFit[np.argmin(abs(zFit-np.max(zActual)))]*r0Final*10**9
         
         xActual = xActual*np.cos(trueRotation) - zActual*np.sin(trueRotation)
         zActual = xActual*np.sin(trueRotation) + zActual*np.cos(trueRotation)    
@@ -405,66 +405,86 @@ def optimize_params(xActual,zActual,sigmaGuess,r0Guess,deltaRho,nReload,trueRota
 #        plt.plot(xCurveFit_App,zCurveFit_App,'b')
 #        plt.pause(1)
 
-    return sigmaFinal,r0Final,bondFinal,dropVolume
+    return sigmaFinal,r0Final,bondFinal
+    
+def get_drop_volume(xActual,zActual,r0,Bo):
+    
+    #splitting data at apex into left and right side
+    xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
+    
+    #get arc length vector
+    intRange,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
+    intRange = intRange/1.5
+    
+    nPoints = len(arcLength)
+    
+    #get coordinates from ode
+    xFit,zFit,fiFit = young_laplace(Bo,nPoints,intRange)
+    xFit = xFit*r0
+    arcLength = arcLength
+        
+    volVec = np.pi*xFit**2*np.sin(fiFit)*arcLength
+
+    dropletVolume = np.sum(volVec)
+
+    return dropletVolume  
     
 def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter, 
                      numMethod, trueSyringeRotation, reloads):
 
     #binarize image
-    binarizedImage = ip.binarize_image(image)    
-    #get interface coordinates
-    interfaceCoordinates = ip.get_interface_coordinates(binarizedImage)
-    interfaceCoordinates = np.array(interfaceCoordinates)
-    #flip the coordinates vertically
-    interfaceCoordinates *= [1,-1]
+    binarizedImage = ip.binarize_image(image)
+
+    if np.all(binarizedImage == 255):
+        surfTen = np.nan
+        dropVol = np.nan
+
+    else:
+        #get interface coordinates
+        interfaceCoordinates = ip.get_interface_coordinates(binarizedImage)
     
-    #offset vertical points     
-    zOffset = -min(interfaceCoordinates[:,1])
-    interfaceCoordinates = interfaceCoordinates + [0,zOffset]
+        interfaceCoordinates = np.array(interfaceCoordinates)
+        #flip the coordinates vertically
+        interfaceCoordinates *= [1,-1]
     
-    # Process capillary image    
-    capillaryRotation,zCoords = ip.get_capillary_rotation(capillaryImage,zOffset)        
+        #offset vertical points     
+        zOffset = -min(interfaceCoordinates[:,1])
+        interfaceCoordinates = interfaceCoordinates + [0,zOffset]
     
-      
-    #isolate drop
-    xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
-    dropCoords = ip.isolate_drop(xCoords,zCoords,interfaceCoordinates)
-    
-    #plt.plot(dropCoords[:,0],dropCoords[:,1])     
-    #get magnification ratio
-    magRatio = ip.get_magnification_ratio(dropCoords, capillaryDiameter,
-                                          capillaryRotation)
-    print(magRatio)
-    
-    #shift coordinates so apex is at 0,0
-    newCenter = [0,0]
-    shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
-    
-    #scale drop
-    scaledCoords = ip.scale_drop(shiftedCoords,magRatio)
-    
-    plt.plot(scaledCoords[:,0],scaledCoords[:,1])
-    #reorder data points and estimate surface tension using 5 point method
-    xData,zData = ip.reorder_data(scaledCoords)
-    s,xe,apexRadiusGuess = bond_calc(xData,zData)
-    surfTen = s_interp(s,xe,deltaRho)
-    dropVol = 1 # MUST CALCULATE THIS SEPARATELY!!!!!!!!!!!!!!!!!!
-    
-    if numMethod == 2: # use all points
-        #run through optimization routine
-        surfTen,apexRadius,bondNumber,dropVol = optimize_params(xData,zData,
-                                                                surfTen,
-                                                                apexRadiusGuess,
-                                                                deltaRho,
-                                                                reloads,
-                                                                trueSyringeRotation)
+        # Process capillary image    
+        capillaryRotation,zCoords,pixelsConv = ip.get_capillary_rotation(capillaryImage,zOffset)        
+          
+        #isolate drop
+        xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
+        dropCoords = ip.isolate_drop(xCoords,zCoords,interfaceCoordinates)
         
-        #express dropletVolume in comparison to initial 
-        if i == 0:
-            initialDropVol = dropVol
-            dropVol  = 1
-        else:
-            dropVol = dropVol/initialDropVol
+      
+        #get magnification ratio
+        magRatio = ip.get_magnification_ratio(pixelsConv, capillaryDiameter,
+                                              capillaryRotation)  
+        
+        #shift coordinates so apex is at 0,0
+        newCenter = [0,0]
+        shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
+    
+        #scale drop
+        scaledCoords = ip.scale_drop(shiftedCoords,magRatio)
+        
+        #reorder data points and estimate surface tension using 5 point method
+        xData,zData = ip.reorder_data(scaledCoords)
+        s,xe,apexRadiusGuess = bond_calc(xData,zData)
+        surfTen = s_interp(s,xe,deltaRho)
+        bondNumber = deltaRho*9.81*apexRadiusGuess**2/surfTen
+        dropVol = get_drop_volume(xData,zData,apexRadiusGuess,bondNumber) # MUST CALCULATE THIS SEPARATELY!!!!!!!!!!!!!!!!!!
+        
+        if numMethod == 2: # use all points
+            #run through optimization routine
+            surfTen,apexRadius,bondNumber = optimize_params(xData,zData,
+                                                            surfTen,
+                                                            apexRadiusGuess,
+                                                            deltaRho,
+                                                            reloads,
+                                                            trueSyringeRotation)
         
     return surfTen, dropVol
 
@@ -476,7 +496,7 @@ if __name__ == "__main__":
     plt.close('all')
       
     # fitting based on z coordinates
-    testObjFunV2 = True
+    testObjFunV2 = False
     # importing test data for analysis
     testData = False
     # vizualization of objective function as a surface plot
@@ -485,14 +505,16 @@ if __name__ == "__main__":
     testArcSum = False
     #test initial Bond finder
     testInitBond = False
+    #test drop volume function
+    testDropVol = True
     
-    if testObjFunV2 or testData or testArcSum or testInitBond:
+    if testObjFunV2 or testData or testArcSum or testInitBond or testDropVol:
         # Generate test data for objective functions
         sigma = 0.06
         r0 = .0015
         deltaRho = 998
         L = 3.5
-        nPoints = 2000
+        nPoints = 1000
         Bond_actual = deltaRho*9.81*r0**2/sigma
         xActual,zActual = get_test_data(sigma,r0,deltaRho,nPoints,L)
               
@@ -529,7 +551,7 @@ if __name__ == "__main__":
             
             intRangeFinal = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,
                                              zDataRight,r0Final)
-            xFit,zFit,vFit=young_laplace(bondFinal,nPoints,intRangeFinal)
+            xFit,zFit,fiFit=young_laplace(bondFinal,nPoints,intRangeFinal)
             
             # plot values with fitted bond number and radius of curvature at apex            
             xCurveFit=xFit*r0Final
@@ -570,3 +592,8 @@ if __name__ == "__main__":
                            
         ax = Axes3D(plt.figure())
         ax.plot_surface(X,Y,np.log10(Z),linewidth=0,antialiased=False)
+        
+    if testDropVol:
+        #Create Test Data
+        dropVolume,volVec = get_drop_volume(xActual,zActual,r0,Bond_actual)        
+        
