@@ -128,7 +128,7 @@ def get_capillary_diameter(line1, line2):
     #line distance is very close to true diameter of the capillary 
     return dist
     
-def get_magnification_ratio(interfaceCoords, actualDiameter,thetaSyringe):
+def get_magnification_ratio(lineDistance, actualDiameter,thetaSyringe):
     """
     Determines magnification ratio through a comparison of capillary diameter.
     
@@ -136,18 +136,19 @@ def get_magnification_ratio(interfaceCoords, actualDiameter,thetaSyringe):
     actualDiameter = float - actual outer diameter of capillary (user input)
     """
     
-    #find first points on capillary edge  
-    #assume that next point on same capillary edge is within a one pixel offset 
-    #in x-direction - recall horizontal line-by-line output from canny edge dection 
-    if interfaceCoords[0,0]-1 <= interfaceCoords[1,0] <= interfaceCoords[0,0]+1:
-        lineCoords = interfaceCoords[0]
-        adjLineCoords = interfaceCoords[2]
-    else:
-        lineCoords = interfaceCoords[0]
-        adjLineCoords = interfaceCoords[1]
-        
-    #calculate line distance and magnification ratio
-    lineDistance = get_capillary_diameter(lineCoords,adjLineCoords)
+#    #find first points on capillary edge  
+#    #assume that next point on same capillary edge is within a one pixel offset 
+#    #in x-direction - recall horizontal line-by-line output from canny edge dection 
+#    if interfaceCoords[0,0]-1 <= interfaceCoords[1,0] <= interfaceCoords[0,0]+1:
+#        lineCoords = interfaceCoords[0]
+#        adjLineCoords = interfaceCoords[2]
+#    else:
+#        lineCoords = interfaceCoords[0]
+#        adjLineCoords = interfaceCoords[1]
+#        
+#    #calculate line distance and magnification ratio
+#    lineDistance = get_capillary_diameter(lineCoords,adjLineCoords)
+    
     magnificationRatio = actualDiameter/lineDistance
     
     magnificationRatio = magnificationRatio/np.cos(thetaSyringe)
@@ -184,13 +185,12 @@ def isolate_drop(lineCoordX, lineCoordZ, interfaceCoords):
     lineCoordX = list - total x range (in pixels) of droplet
     lineCoordZ = list - z-coordinate (in pixels) of user input for isolating droplet
     """
-    linePosition = True
-    cutoffPoint = None        
+#    linePosition = True
+#    cutoffPoint = None        
     
-    #give extra room for cutoff of droplet (view 7/8ths of droplet)
-    zCutOff = lineCoordZ - lineCoordZ/8    
-    print(zCutOff)
-  
+    #give extra room for cutoff of droplet (view 15/16ths of droplet)
+    zCutOff = lineCoordZ - lineCoordZ/16    
+
 ##    #loop to find the outline coordinate where the outline coordinate is below the line
 #    for i in range (0, len(interfaceCoords)):
 #        linePosition = calculate_dot_product(lineCoordX, zCutOff,
@@ -228,7 +228,7 @@ def shift_coords(xCoords, zCoords, newCenter):
     """
     
 #    #determine offset of current droplet center
-#    apexLocation = np.argmax(zCoords)
+#    apexLocation = np.argmin(zCoords)
 #    apexIndex    = int(np.average(apexLocation))    
 #    
 #    xOffset =  xCoords[apexIndex]
@@ -370,14 +370,27 @@ def get_capillary_rotation(capillaryImage,zTranslate):
     
     interfaceCoordinates = interfaceCoordinates + [0,zTranslate]
     
-#    plt.plot(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
-    for i in range(len(interfaceCoordinates)-2):
-        #average slope right here!
-        z1 = interfaceCoordinates[i+1][1]
-        x1 = interfaceCoordinates[i+1][0]
+    #get pixel length of capillary diameter
+    capPoints = interfaceCoordinates[np.where(interfaceCoordinates[:,1] == max(interfaceCoordinates[:,1]))]
+    capillaryDiameter = max(capPoints[:,0])-min(capPoints[:,0])    
+    
+    
+    capTip = min(interfaceCoordinates[:,1])
+    
+    capMax = max(interfaceCoordinates[:,1])
+    capMin = min(interfaceCoordinates[:,1]) + (capMax-capTip)/8
+    
+    capLine = interfaceCoordinates[np.where(interfaceCoordinates[:,0] < np.average(capPoints[:,0]))]
+    capLine = capLine[np.where((capMin < capLine[:,1]) & (capLine[:,1] < capMax))]
+    
         
-        z2 = interfaceCoordinates[i+2][1]
-        x2 = interfaceCoordinates[i+2][0]   
+    for i in range(len(capLine)-1):
+        #average slope right here!
+        z1 = capLine[i][1]
+        x1 = capLine[i][0]
+        
+        z2 = capLine[i+1][1]
+        x2 = capLine[i+1][0]   
         
         slope = np.append(slope,(x1-x2)/(z1-z2))
     
@@ -387,7 +400,7 @@ def get_capillary_rotation(capillaryImage,zTranslate):
     
     capCutOff = min(interfaceCoordinates[:,1])
 
-    return trueVerticalRotationAngle,capCutOff
+    return trueVerticalRotationAngle,capCutOff,capillaryDiameter
     
     
     
@@ -433,17 +446,17 @@ if __name__ == "__main__":
     xActual,zActual = dp.get_test_data(sigma,r0,deltaRho,nPoints,L)
     testArray = np.append([xActual],[zActual],axis=0).transpose()    
     
-    folderName = 'Code Testing' # Must be located in Data folder
-    # Parse user inputs
-    dirName = '../Data/' + folderName + '/' 
-    fileList = glob.glob(dirName + '*0*.jpg')
-    capillaryImage = ie.load_image_file(dirName + 'CapillaryImage.jpg')
-    dropImage = fileList[0]
+#    folderName = 'Code Testing' # Must be located in Data folder
+#    # Parse user inputs
+#    dirName = '../Data/' + folderName + '/' 
+#    fileList = glob.glob(dirName + '*0*.jpg')
+#    capillaryImage = ie.load_image_file(dirName + 'CapillaryImage.jpg')
+#    dropImage = fileList[0]
     
     #test flags: change to True when testing specific functions
     
     #flag1 = test for binarize_image()
-    flag1 = False
+    flag1 = True
     
     #flag2 = test for detect_boundary()
     flag2 = False
@@ -471,14 +484,14 @@ if __name__ == "__main__":
     flag10 = False
     
     #flag11: test for getting string interface coordinates
-    flag11 = True
+    flag11 = False
     
     
 
     
     #flag1 = test for binarize_image()
     if (flag1 == True):
-        image = ie.load_image_file('H2O in PDMS.jpg')
+        image = ie.load_image_file('../Data/Environmental Testing/Triton x-100 0.08 mM/Testing Black Images\TestImage0458.jpg')
         binarizedImage = binarize_image(image)
         plt.imshow(binarizedImage,cmap='gray')
     
