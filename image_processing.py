@@ -432,12 +432,19 @@ def get_rotated_droplet(dropletCoords,rotOffset):
     return rotatedDropletCoords
     
 def get_images_from_video(filename,directory):
-#    ffmpeg -i input.mov -r 0.25 output_%04d.png
-    outputDir = directory + '/'
-    os.chdir('C:/ffmpeg/bin')
 
-    videoFiles = ffmpy.FFmpeg(inputs = {filename: None}, 
-                              outputs = {outputDir +'output%05d.jpg': None})
+    #create new folder for time lapse images
+    os.mkdir(directory + '/' + 'timeFrame')
+    
+    videoFile = directory + '/' + filename
+    outputDir = directory + '/' + 'timeFrame' + '/'
+    
+    #change directory for ffmpeg to be excecuted in command line through wrapper
+    os.chdir('C:/ffmpeg/bin')
+    
+
+    videoFiles = ffmpy.FFmpeg(inputs = {videoFile: None}, 
+                              outputs = {outputDir +'TestImage%05d.jpg': None})
 
     return videoFiles
   
@@ -613,7 +620,7 @@ if __name__ == "__main__":
     #flag12: test for getting string interface coordinates
     if flag12:
         dirName = 'C:/Research/Pendant Drop/Data/Video Testing'
-        filename = dirName + '/' + 'Video.avi'
+        filename = 'Video2.avi'
         imageFiles = get_images_from_video(filename,dirName)
         imageFiles.run()
 
