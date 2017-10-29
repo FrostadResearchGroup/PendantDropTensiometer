@@ -11,6 +11,9 @@ import data_processing as dp
 import image_extraction as ie
 import matplotlib.pyplot as plt
 import glob
+import ffmpy
+import ffmpegwrapper
+import os
 
 def binarize_image(image):
     """
@@ -427,6 +430,17 @@ def get_rotated_droplet(dropletCoords,rotOffset):
     
     
     return rotatedDropletCoords
+    
+def get_images_from_video(filename,directory):
+#    ffmpeg -i input.mov -r 0.25 output_%04d.png
+    outputDir = directory + '/'
+    os.chdir('C:/ffmpeg/bin')
+
+    videoFiles = ffmpy.FFmpeg(inputs = {filename: None}, 
+                              outputs = {outputDir +'output%05d.jpg': None})
+
+    return videoFiles
+  
 
 
               
@@ -456,7 +470,7 @@ if __name__ == "__main__":
     #test flags: change to True when testing specific functions
     
     #flag1 = test for binarize_image()
-    flag1 = True
+    flag1 = False
     
     #flag2 = test for detect_boundary()
     flag2 = False
@@ -485,6 +499,9 @@ if __name__ == "__main__":
     
     #flag11: test for getting string interface coordinates
     flag11 = False
+    
+    #flag12: test for getting images from video
+    flag12 = True
     
     
 
@@ -592,3 +609,12 @@ if __name__ == "__main__":
 #        
 #        interfaceCoordinates = get_interface_calibration_coordinates(edges)
 #        plt.scatter(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
+
+    #flag12: test for getting string interface coordinates
+    if flag12:
+        dirName = 'C:/Research/Pendant Drop/Data/Video Testing'
+        filename = dirName + '/' + 'Video.avi'
+        imageFiles = get_images_from_video(filename,dirName)
+        imageFiles.run()
+
+         
