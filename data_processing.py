@@ -407,30 +407,48 @@ def optimize_params(xActual,zActual,sigmaGuess,r0Guess,deltaRho,nReload,trueRota
 
     return sigmaFinal,r0Final,bondFinal
     
-def get_drop_volume(xActual,zActual,r0,Bo):
+def get_drop_volume(xActual,zActual,r0):
     
-    #splitting data at apex into left and right side
-    xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
+#    #splitting data at apex into left and right side
+#    xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
+#    
+#    #get arc length vector
+#    intRange,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
+#    intRange = intRange/1.5
+#    
+#    nPoints = len(arcLength)
+#    
+#    #get coordinates from ode
+#    xFit,zFit,fiFit = young_laplace(Bo,nPoints,intRange)
+#    xFit = xFit*r0
+#    arcLength = arcLength
+     
     
-    #get arc length vector
-    intRange,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
-    intRange = intRange/1.5
-    
-    nPoints = len(arcLength)
-    
-    #get coordinates from ode
-    xFit,zFit,fiFit = young_laplace(Bo,nPoints,intRange)
-    xFit = xFit*r0
-    arcLength = arcLength
-        
-    volVec = np.pi*xFit**2*np.sin(fiFit)*arcLength
+    volVec = np.abs(np.pi*xActual[1:]**2*(zActual[1:]-zActual[:-1]))/2
 
     dropletVolume = np.sum(volVec)
 
     return dropletVolume  
+
+def get_volume_error(dropVolume,coeffThermalExpansion,
+                                               magnificationRatio,deltaT):
+    """
+    Creates an error measurement of volume based off resolution uncertainty 
+    and thermal expansion.
+    """
+    
+    #define uncertainty associated with pixelation and error from temp. fluctuations
+    resUncert = (magnificationRatio/2)
+    tempFluct = coeffThermalExpansion*deltaT*dropVolume*10**9
+
+    #define total error
+    totalError = resUncert**3+tempFluct
+
+    return totalError    
     
 def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter, 
-                     numMethod, trueSyringeRotation, reloads):
+                     numMethod, trueSyringeRotation, reloads, tempFluct, 
+                     thermalExpCoeff):
 
     #binarize image
     binarizedImage = ip.binarize_image(image)
@@ -475,7 +493,9 @@ def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter,
         s,xe,apexRadiusGuess = bond_calc(xData,zData)
         surfTen = s_interp(s,xe,deltaRho)
         bondNumber = deltaRho*9.81*apexRadiusGuess**2/surfTen
-        dropVol = get_drop_volume(xData,zData,apexRadiusGuess,bondNumber) # MUST CALCULATE THIS SEPARATELY!!!!!!!!!!!!!!!!!!
+        dropVol = get_drop_volume(xData,zData,apexRadiusGuess) 
+        
+        volError = get_volume_error(dropVol,thermalExpCoeff,magRatio,tempFluct)        
         
         if numMethod == 2: # use all points
             #run through optimization routine
@@ -486,9 +506,10 @@ def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter,
                                                             reloads,
                                                             trueSyringeRotation)
         
-    return surfTen, dropVol
-
+    return surfTen, dropVol,volError
     
+    
+        
 ######################## For Testing Purposes #################################   
    
 if __name__ == "__main__":
