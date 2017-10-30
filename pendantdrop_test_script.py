@@ -22,7 +22,9 @@ deltaRho = 998 #absolute density difference between two fluids in kg/m^3
 capillaryDiameter = 2.10 #capillary diameter in mm
 reloads = 1 #converge 
 trueSyringeRotation = 0 #unsure of true syringe rotation
-folderName = 'Environmental Testing/Triton x-100 0.08 mM/Cuvette + Insulation, 4 Hr, 0.5 Hz' # Must be located in Data folder
+deltaT = 1 #volumetric thermal flucutations
+thermalExpCoeff = 0.000214 #1/K or 1/C
+folderName = 'Environmental Testing/Triton x-100 0.08 mM/Cuvette + Insolation, 10 min, 0.5 Hz' # Must be located in Data folder
 numMethod = 1 # 1 for 5 points (faster), 2 for all points
 imageExtension = '.jpg'
 
@@ -53,10 +55,11 @@ N = len(fileList)-1
 # Allocate arrays for storing data
 surfaceTenVec = np.zeros((N,1))
 dropVolVec = np.zeros((N,1))
+volErrorVec = np.zeros((N,1))
 timeVec = np.zeros((N,1))
 
 # Read time vector
-timeData = glob.glob(dirName + '*Time*' + '.csv') 
+timeData = glob.glob(dirName + '*time*' + '.csv') 
 with open(timeData[0], 'rb') as timeFile:
     timeLapse  = csv.reader(timeFile)    
     timeLapse  = list(timeLapse)    
@@ -71,25 +74,30 @@ for i in range(N):
     
     ret = dp.get_surf_tension(dropletImage, capillaryImage, deltaRho,
                                         capillaryDiameter, numMethod, 
-                                        trueSyringeRotation, reloads)
+                                        trueSyringeRotation, reloads,
+                                        deltaT,thermalExpCoeff)
                     
     #returns values if not black image                                    
     if not isnan(ret[0]):
         surfaceTenVec[i] = ret[0]*10**3
         dropVolVec[i]    = ret[1]*10**9
-        timeVec[i]       = timeLapse[i][0]
+        volErrorVec[i]   = ret[2]
+        timeVec[i]       = timeLapse[0][i]
         
     else:
         surfaceTenVec[i] = nan
         dropVolVec[i]    = nan
+        volErrorVec[i]   = nan
         timeVec[i]       = nan
 
 surfaceTenVec = surfaceTenVec[np.where(np.isfinite(surfaceTenVec))]
 dropVolVec    = dropVolVec[np.where(np.isfinite(dropVolVec))]
+volErrorVec    = volErrorVec[np.where(np.isfinite(volErrorVec))]
 timeVec       = timeVec[np.where(np.isfinite(timeVec))]
 
 avgSurfaceTen = np.average(surfaceTenVec)
-relDropVolVec = dropVolVec/dropVolVec[0]  
+relDropVolVec = dropVolVec/dropVolVec[0]
+relVolErrorVec = volErrorVec/dropVolVec[0]  
                 
 #if numMethod == 1:
 #    stats = np.vstack([timeVec,surfaceTenVec,bondNumberVec,dropVolVec,apexRadiusVec]).transpose()
@@ -103,36 +111,38 @@ relDropVolVec = dropVolVec/dropVolVec[0]
 
 # Plot surface tension vs. time
 plt.figure()
-plt.plot(timeVec,surfaceTenVec,'k')
+plt.plot(timeVec,surfaceTenVec,'ko')
 plt.xlabel('Time (s)')
 plt.ylabel('Surface Tension (mN/m)')
 plt.title('Surface Tension vs. Time')
 
 # Plot drop volume vs. time
 plt.figure()
-plt.plot(timeVec,dropVolVec,'k')
+plt.plot(timeVec,dropVolVec,'ko')
 plt.xlabel('Time (s)')
 plt.ylabel('Drop Volume (mm$^3$)')
 plt.title('Drop Volume vs. Time')
+plt.errorbar(timeVec,dropVolVec,yerr=volErrorVec,fmt=' ')
 
 
 # Plot drop volume vs. time
 plt.figure()
-plt.plot(timeVec,relDropVolVec,'k')
+plt.plot(timeVec,relDropVolVec,'ko')
 plt.xlabel('Time (s)')
 plt.ylabel('V/$V_0$')
 plt.title('Relative Drop Volume vs. Time')
+plt.errorbar(timeVec,relDropVolVec,yerr=relVolErrorVec,fmt=' ')
 
 
-with open(saveFile, 'wb') as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(['Time [s]','Surface Tension [mN/m]','Drop Volume [mm^3]',
-                                                     'Relative Drop Volume'])
-    for i in range(len(timeVec)):
-        writer.writerow([timeVec[i],surfaceTenVec[i],dropVolVec[i],relDropVolVec[i]])
-    writer.writerow(['Average ST [mN/m]','Std Dev'])
-    StandDev= np.std(surfaceTenVec)
-    writer.writerow([avgSurfaceTen,StandDev])
+#with open(saveFile, 'wb') as csvfile:
+#    writer = csv.writer(csvfile)
+#    writer.writerow(['Time [s]','Surface Tension [mN/m]','Drop Volume [mm^3]',
+#                                                     'Relative Drop Volume'])
+#    for i in range(len(timeVec)):
+#        writer.writerow([timeVec[i],surfaceTenVec[i],dropVolVec[i],relDropVolVec[i]])
+#    writer.writerow(['Average ST [mN/m]','Std Dev'])
+#    StandDev= np.std(surfaceTenVec)
+#    writer.writerow([avgSurfaceTen,StandDev])
 
 #print 'Average = %0.2f +/- %0.02f mN/m' %(np.mean(surfaceTenVec),np.std(surfaceTenVec))
         
