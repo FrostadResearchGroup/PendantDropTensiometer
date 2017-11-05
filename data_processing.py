@@ -17,6 +17,7 @@ from scipy.integrate import odeint
 
 import matplotlib.pyplot as plt
 import time
+import nidaqmx
 
 def ode_system(y,t,bond):
     """
@@ -445,6 +446,17 @@ def get_volume_error(dropVolume,coeffThermalExpansion,
     totalError = resUncert**3+tempFluct
 
     return totalError    
+
+def get_temperature():
+    """
+    Gets temperature through thermocouple attached to NI DAQ system.
+    """
+    
+    with nidaqmx.Task() as task:
+        task.ai_channels.add_ai_thrmcpl_chan("Dev1/ai0")
+        data = task.read(number_of_samples_per_channel=1)
+        
+    return data
     
 def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter, 
                      numMethod, trueSyringeRotation, reloads, tempFluct, 
@@ -454,8 +466,9 @@ def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter,
     binarizedImage = ip.binarize_image(image)
 
     if np.all(binarizedImage == 255):
-        surfTen = np.nan
-        dropVol = np.nan
+        surfTen  = np.nan
+        dropVol  = np.nan
+        volError = np.nan
 
     else:
         #get interface coordinates
@@ -527,7 +540,9 @@ if __name__ == "__main__":
     #test initial Bond finder
     testInitBond = False
     #test drop volume function
-    testDropVol = True
+    testDropVol = False
+    #test DAQ temperature readings
+    testDAQtemp = True
     
     if testObjFunV2 or testData or testArcSum or testInitBond or testDropVol:
         # Generate test data for objective functions
@@ -616,5 +631,9 @@ if __name__ == "__main__":
         
     if testDropVol:
         #Create Test Data
-        dropVolume,volVec = get_drop_volume(xActual,zActual,r0,Bond_actual)        
+        dropVolume,volVec = get_drop_volume(xActual,zActual,r0,Bond_actual)
+
+    if testDAQtemp:
+        
+        temperature = get_temperature()        
         
