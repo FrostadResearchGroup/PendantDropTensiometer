@@ -5,9 +5,9 @@
 %user inputs
 %entering inputs for droplets
 fluid_name= 'H2O' ;          %fluid medium, or pure fluid ID
-date= 'Oct19th';            %date- no space before number!
-surfactant_name= 'HTAB'      %change for new surfactant
-concentration= 'C=0000mM';   %change for each new concentration
+date= 'Nov14th';            %date- no space before number!
+surfactant_name= 'TritonX-100';      %change for new surfactant
+concentration= 'C=0000.01mM';   %change for each new concentration
 directory_name_addition= strcat(char(surfactant_name),'\',char(date)); %change variable inside first char command if not surfactant
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -35,6 +35,7 @@ while decision_for_loop== 'Y'
     totalTime = 5*1.5; % Time in seconds
     period = 1.5 ; % NOTE: cannot go below 1.5s and value is approximate
     CameraNum = 1;
+    equilbTime = 15;
 
     % Parse imput parameters
     N = ceil(totalTime/period); 
@@ -55,7 +56,7 @@ while decision_for_loop== 'Y'
         img = getdata(vid);
         stop(vid);
         conversion_step= num2str(i);
-        capillary_name= strcat('CapillaryImage','.jpg');
+        capillary_name= strcat('CapillaryImage','_',surfactant_name,'_',concentration,'_','.jpg');
         imwrite(img,capillary_name);
         
     else 
@@ -74,9 +75,9 @@ while decision_for_loop== 'Y'
     closepreview
     fprintf('Please create droplet and immediately press "Enter" to start time delay and time lapse.')
     preview(vid);
-    pause
+    pause;
     closepreview
-    pause(1)
+    pause(equilbTime)
 
     tic
     for j = 1:N
@@ -102,8 +103,8 @@ while decision_for_loop== 'Y'
         end 
     end
     
-    naming_time_vector= strcat('timeVector','_',conversion_step,'.csv');
-    csvwrite(naming_time_vector,t(1:N-1))
+%     naming_time_vector= strcat('timeVector','_',conversion_step,'.csv');
+%     csvwrite(naming_time_vector,t(1:N-1))
 
     % Close camera
     clear vid
