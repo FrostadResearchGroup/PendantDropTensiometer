@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Fri Nov 24 15:01:49 2017
+
+@author: jlapucha
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Thu Jun 22 12:26:32 2017
 @author: Yohan
 """
@@ -19,6 +26,8 @@ from pylab import *
 
 #input parameters  
 deltaRho = 998 #absolute density difference between two fluids in kg/m^3
+g= 9.810 #local acceleration of gravity in m/s^2
+pi= 3.14159
 capillaryDiameter = 2.10 #capillary diameter in mm
 reloads = 1 #converge 
 trueSyringeRotation = 0 #unsure of true syringe rotation
@@ -46,7 +55,12 @@ def get_image_conc(fileName):
     ind2 = fileName.find('mM_')
     conc = float(fileName[ind1+2:ind2])
     return conc
-
+#Calculation of worthington number
+def get_Wo_number(dropVolvec, surfaceTenVec):
+    Vo= dropVolVec
+    sigma= surfaceTenVec
+    Wo= (deltaRho*g*Vo)/(pi*sigma*capillaryDiameter)
+    return Wo
 # Parse user inputs
 dirName = '../Data/' + folderName + '/' 
 fileList = glob.glob(dirName + '*H2O*' + imageExtension)
@@ -67,6 +81,7 @@ stdDevSurfTenVec = np.zeros((N,1))
 avgSurfaceTen = np.zeros((N,1))
 concVec = np.zeros((N,1))
 avgSTandSDev=[]
+Wo_number_vs_image= []
 #avgSTandSDev= np.zeros(shape=(N,3))
 ##
 
@@ -116,9 +131,13 @@ for i in range(N):
     avgSurfaceTen[i] = np.mean(surfaceTenVec)
     concVec[i]       = get_image_conc(capillaryFile[i])
     stdDevSurfTenVec[i] = np.std(surfaceTenVec)  
+    #function get Worthington number
+    Wo= get_Wo_number(dropVolvec, surfaceTenVec)
+    Wo_number_vs_image.append(Wo)
     #appending strings to array
     avgSTandSDev.append(avgSurfaceTen[i])
     avgSTandSDev.append(stdDevSurfTenVec[i])
+    avgSTandSDev.append(Wo)
 
 concVec  = concVec[np.where(np.isfinite(concVec))]
 avgSTandSDev.append(concVec)
@@ -127,7 +146,8 @@ if numMethod== 1:
     NumericalMethodName='5-Point Calculation, '
 else: 
     NumericalMethodName= 'Numerical Method, '
-    
+   
+  
 # Plot surface tension vs concentration
 plt.semilogx(concVec,avgSurfaceTen,'k^')
 plt.title('TritonX-100 Isotherm, ' + NumericalMethodName + str(avgTemp) + ' degrees C')
@@ -140,6 +160,7 @@ with open(saveFile, 'wb') as csvfile:
     writer.writerow(['Concentration [mM]','Surface Tension [mN/m]'])
     for i in range(N):
         writer.writerow([concVec[i],avgSurfaceTen[i]])
+        writer.writerow([concVec[i],surfaceTenVec])
     writer.writerow(['Average ST [mN/m]','Std Dev'])
     StandDev= stdDevSurfTenVec
     writer.writerow([avgSurfaceTen,StandDev])
@@ -147,3 +168,4 @@ with open(saveFile, 'wb') as csvfile:
 print 'Average = %0.2f +/- %0.02f mN/m' %(np.mean(surfaceTenVec),np.std(surfaceTenVec))
 average_surface_tension= np.mean(surfaceTenVec)
 standard_deviation= np.std(surfaceTenVec)       
+   
