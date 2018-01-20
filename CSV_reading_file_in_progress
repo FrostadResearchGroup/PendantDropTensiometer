@@ -1,0 +1,63 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jan 19 12:50:31 2018
+
+@author: Joanna
+"""
+
+##CSV Files reading version 2
+###import of relevant modules
+import numpy as np
+import scipy as sci
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.integrate import odeint
+import math as math
+import csv
+from pylab import *
+import os
+import glob as glob
+
+#################################################
+#USER-DEFINED INPUTS
+gen_path= 'C:\Users\Joanna\Desktop\DFI_Thesis_Data'
+specific_file= '\\SDS_1_Jan16th\\'
+fileExt= '.csv'
+
+##################################################
+
+filepath= gen_path + specific_file
+
+
+def get_image_conc(filepath):
+    ind= filepath.find('_') 
+    conc= float(filepath[ind])
+    return conc
+
+#concentration= []
+
+#for m in csvfiles:
+#    concentration.append(get_image_conc(csvfiles[m]))
+#    
+
+fileList= glob.glob(filepath+ '*mM*' + fileExt)
+
+csvfiles= []
+csv_files_reading= []
+info= []
+for filename in os.listdir(filepath):
+    csvfiles.append(filename)
+
+#if len(csvfiles) > 0:
+#    conc= csvfiles[0]
+#    concentration.append(get_image_conc(conc))
+data_file= []
+for i in range(len(csvfiles)):
+    file= filepath+csvfiles[i]
+    with open(file,'rb') as csvfile:
+        reader= csv.reader(csvfile, delimiter= ';', quotechar='|')
+        for row[:] in reader:
+            print ','.join(row)
+            data_file.append(row[6])
+    i=i+1
+            
