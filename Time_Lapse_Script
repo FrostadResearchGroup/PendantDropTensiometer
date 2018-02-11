@@ -1,0 +1,225 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jun 22 12:26:32 2017
+@author: Yohan
+"""
+
+#import code blocks
+import image_extraction as ie
+import data_processing as dp
+
+#import other modules
+import numpy as np
+import glob
+import matplotlib.pyplot as plt
+import csv
+from pylab import *
+
+##############################################################################
+
+#input parameters  
+deltaRho = 998 #absolute density difference between two fluids in kg/m^3
+capillaryDiameter = 2.10 #capillary diameter in mm
+reloads = 1 #converge 
+trueSyringeRotation = 0 #unsure of true syringe rotation
+deltaT = 2 #volumetric thermal flucutations
+thermalExpCoeff = 0.000214 #1/K or 1/C
+folderName = 'Biofilm Testing/LB Broth, 48 Hr Test 6 (10 Hz)' # Must be located in Data folder
+numMethod = 1 # 1 for 5 points (faster), 2 for all points
+imageExtension = '.jpg'
+roomTemp = 23 #C
+syringeFluid = 10**-3 #mm3 
+plotData = False
+storeData = False
+bubbleContour = True
+##############################################################################
+
+# Parse user inputs
+dirName = '../Data/' + folderName + '/' 
+fileList = glob.glob(dirName + '*Test*' + imageExtension)
+saveFile = dirName + 'output.csv'
+capillaryFile = glob.glob(dirName + '*Capillary*' + imageExtension)
+capillaryImage = ie.load_image_file(capillaryFile[0])
+N = len(fileList)-1
+
+# Allocate arrays for storing data
+surfaceTenVec = np.zeros((N,1))
+dropVolVec = np.zeros((N,1))
+volErrorVec = np.zeros((N,1))
+bondNumberVec = np.zeros((N,1))
+timeVec = np.zeros((N,1))
+
+## Read time vector
+#timeData = glob.glob(dirName + '*time*' + '.csv') 
+#with open(timeData[0], 'rb') as timeFile:
+#    timeLapse  = csv.reader(timeFile)    
+#    timeLapse  = list(timeLapse)    
+
+
+for i in range(N):
+    imageFile = fileList[i]
+    dropletImage = ie.load_image_file(imageFile)     
+    
+    ret = dp.get_surf_tension(dropletImage, capillaryImage, deltaRho,
+                                        capillaryDiameter, numMethod, 
+                                        trueSyringeRotation, reloads,
+                                        deltaT,thermalExpCoeff)
+                    
+    #returns values if not black image                                    
+    if not isnan(ret[0]):
+        surfaceTenVec[i] = ret[0]*10**3
+        dropVolVec[i]    = ret[1]*10**9
+        volErrorVec[i]   = ret[2]
+        bondNumberVec[i] = ret[3]
+#        timeVec[i]       = timeLapse[0][i]
+        
+    #index time by frame number if using ffmpy
+        timeVec[i]       = i*10
+        
+    else:
+        surfaceTenVec[i] = nan
+        dropVolVec[i]    = nan
+        volErrorVec[i]   = nan
+        bondNumberVec[i] = nan
+        timeVec[i]       = nan
+
+surfaceTenVec = surfaceTenVec[np.where(np.isfinite(surfaceTenVec))]
+dropVolVec    = dropVolVec[np.where(np.isfinite(dropVolVec))]
+volErrorVec    = volErrorVec[np.where(np.isfinite(volErrorVec))]
+timeVec       = timeVec[np.where(np.isfinite(timeVec))]/3600
+bondNumberVec = bondNumberVec[np.where(np.isfinite(volErrorVec))]
+
+avgSurfaceTen = np.average(surfaceTenVec)
+relDropVolVec = dropVolVec/dropVolVec[0]
+relVolErrorVec = volErrorVec/dropVolVec[0]  
+
+
+######################## Plotting and Storing Data ############################
+
+if __name__ == "__main__":
+
+  
+    if plotData: 
+        
+        # Define plotting text features
+        titleFont = {'family': 'serif','weight': 'bold','size': 15}
+        axesFont = {'weight': 'bold'}
+                        
+        # Plot surface tension vs. time
+        fig,ax1 = plt.subplots()
+        plt.title('BHI Broth, 48 Hr Test (0.1 Hz)',titleFont)
+        plt1 = ax1.plot(timeVec,surfaceTenVec,'bo',markeredgewidth=0.0,label='Surface Tension')
+        ax1.set_xlabel('Time (hr)',fontdict=axesFont)
+        ax1.set_xticks(np.arange(0,max(timeVec),12))
+        ax1.set_ylabel('Surface Tension (mN/m)',fontdict=axesFont)
+        ax1.tick_params('y',colors='k')
+        ax1.set_ylim([int(min(surfaceTenVec))-2,int(max(surfaceTenVec))+4])
+        
+        
+        #add uncertainty annotation 
+        plt.figtext(1,1,'Volumetric Uncertainty = +/- %0.3f mm$^3$' 
+        %(np.average(volErrorVec)),horizontalalignment = 'right', verticalalignment = 'top')
+    
+
+        #add final bond number annotation 
+        plt.figtext(1,1,'Final Bond Number = +/- %0.3f mm$^3$' %bondNumberVec[-1],
+                            horizontalalignment = 'right', verticalalignment = 'bottom')
+    
+    
+        
+        # Plot relative drop volume vs. time
+        ax2 = ax1.twinx()
+        plt2 = ax2.plot(timeVec,relDropVolVec,'ro',markeredgewidth=0.0,label='Rel. Drop Volume')
+        plt3 = ax2.plot(timeVec,bondNumberVec,'yo',markeredgewidth=0.0,label='Bond Number')
+        ax2.set_ylabel('V/V$_0$ and Bond Number',fontdict=axesFont)
+        ax2.set_ylim([0,1.5])
+        ax2.tick_params('y',colors='k')
+        
+        plots = plt1+plt2+plt3
+        pltabs =[p.get_label() for p in plots]
+        ax1.legend(plots,pltabs,loc='best',prop={'size': 10})
+        
+        plt.show()
+        
+    if storeData:
+        
+        plt.savefig(dirName + 'Results.png')
+        
+        
+        with open(saveFile, 'wb') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Time [hr]','Surface Tension [mN/m]','Drop Volume [mm^3]',
+                                                             'Relative Drop Volume',
+                                                             'Volume Error (+/- 1C [mm^3]',
+                                                             'Bond Number'])
+                                                             
+            for i in range(len(timeVec)):
+                writer.writerow([timeVec[i],surfaceTenVec[i],
+                                 dropVolVec[i],relDropVolVec[i],
+                                 volErrorVec[i],bondNumberVec[i]])
+            writer.writerow(['Average ST [mN/m]','Std Dev'])
+            StandDev= np.std(surfaceTenVec)
+            writer.writerow([avgSurfaceTen,StandDev])
+            
+    if bubbleContour:
+        
+        #define length of test (hrs)
+        totTime = 48
+        totTime *= 3600
+        
+        timeVec = np.linspace(0,totTime,totTime/10)
+        timeVec /= 3600
+
+        #input sinusodial temperature swing of delT(period = 12 hours)
+        w = 2*np.pi/24
+        temp = deltaT*np.sin(w*timeVec)+roomTemp        
+        
+        # Define plotting text features
+        titleFont = {'family': 'serif','weight': 'bold','size': 15}
+        axesFont = {'weight': 'bold'}        
+        
+        bubbleRad = np.array([1,250,500,1000])*10**-3        
+        
+        #initial droplet size (mm)
+        initDrop = 12
+        
+        #initialize initial droplet matrix       
+        expDropVolVec = np.ones([len(temp),len(bubbleRad)])*initDrop      
+        
+        
+        for i in range(len(bubbleRad)):
+
+            bubbleVol = 4*np.pi*bubbleRad[i]**3/3
+            
+            for j in range(len(temp)):
+                
+                #use IGL considering constant p and n
+                expBubbleVol = (temp[j])*bubbleVol/temp[0]-bubbleVol
+                
+                #consider expantion of fluid inside syringe (1mL)          
+                expLiquidVol = thermalExpCoeff*syringeFluid*(temp[j]-temp[0])
+                
+                expDropVolVec[j,i] = initDrop+expBubbleVol+expLiquidVol
+        
+        
+        # Plot expanded droplet volume vs. time
+        plots = []
+        radii = ['1 um','250um','500 um','1000 um']
+        fig,ax1 = plt.subplots()
+        plt.title('Temperature Effects on Droplet Volume',titleFont)
+        # Plot set of curves for each bubble radius
+        for ii in range(len(bubbleRad)):
+            plts = ax1.plot(timeVec,expDropVolVec[:,ii],
+                            c=np.random.rand(3,1),markeredgewidth=0.0,
+                            label=radii[ii])
+            plots = plots + plts
+        ax1.set_xlabel('Time (hr)',fontdict=axesFont)
+        ax1.set_xticks(np.arange(0,max(timeVec),12))
+        ax1.set_ylabel('Drop Volume (mm$^3$), $\delta$T = 2$^o$C ',fontdict=axesFont)
+        ax1.tick_params('y',colors='k')
+        ax1.set_ylim([11.6,12.4])
+        
+        ax1.legend(plots,radii,loc='best',prop={'size': 10})
+        
+        plt.show()
+        
