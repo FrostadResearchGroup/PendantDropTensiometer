@@ -409,27 +409,25 @@ def optimize_params(xActual,zActual,sigmaGuess,r0Guess,deltaRho,nReload,trueRota
     return sigmaFinal,r0Final,bondFinal
     
 def get_drop_volume(xActual,zActual,r0):
-    
-#    #splitting data at apex into left and right side
-#    xDataLeft,zDataLeft,xDataRight,zDataRight = split_data(xActual,zActual)
-#    
-#    #get arc length vector
-#    intRange,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
-#    intRange = intRange/1.5
-#    
-#    nPoints = len(arcLength)
-#    
-#    #get coordinates from ode
-#    xFit,zFit,fiFit = young_laplace(Bo,nPoints,intRange)
-#    xFit = xFit*r0
-#    arcLength = arcLength
-     
-    
+    """
+    Determines volume of droplet.
+    """
     volVec = np.abs(np.pi*xActual[1:]**2*(zActual[1:]-zActual[:-1]))/2
 
     dropletVolume = np.sum(volVec)
 
-    return dropletVolume  
+    return dropletVolume
+    
+def get_drop_SA(xActual,zActual,r0):
+    """
+    Determines surface area of droplet.
+    """
+    
+    surfAreaVec = np.abs(2*np.pi*xActual[1:]*(zActual[1:]-zActual[:-1]))/2
+    
+    surfArea = np.sum(surfAreaVec)
+    
+    return surfArea
 
 def get_volume_error(dropVolume,coeffThermalExpansion,
                                                magnificationRatio,deltaT):
@@ -441,34 +439,86 @@ def get_volume_error(dropVolume,coeffThermalExpansion,
     #define uncertainty associated with pixelation and error from temp. fluctuations
     resUncert = (magnificationRatio/2)
     tempFluct = coeffThermalExpansion*deltaT*dropVolume*10**9
-
+    
     #define total error
     totalError = resUncert**3+tempFluct
 
-    return totalError    
+    return totalError   
 
-def get_temperature():
+def get_temperature(seebeckCoeff=65*10**-6):
     """
     Gets temperature through thermocouple attached to NI DAQ system.
     """
     
     with nidaqmx.Task() as task:
-        task.ai_channels.add_ai_thrmcpl_chan("Dev1/ai0")
-        data = task.read(number_of_samples_per_channel=1)
+            
+        task.ai_channels.add_ai_voltage_chan("Dev2/ai3")
         
+#        #ground thermocouple
+#        nidaqmx.constants.InputCalSource = 2
+
+        #use differential setting
+        nidaqmx.constants.TerminalConfiguration = -1
+#        nidaqmx.constants.TerminalConfiguration = 10106
+
+#        #set thermocouple type (J-type)
+#        nidaqmx.constants.ThermocoupleType = 10072
+#
+#        #set temperature units (Celsisus)
+#        nidaqmx.constants.TemperatureUnits = 10143     
+    
+        
+        data = np.array(task.read(number_of_samples_per_channel=1))
+        
+        temp = data/seebeckCoeff
+        
+    return temp
+
+def remove_offsets(data):
+    """
+    Offsets step changes in data for turbidity measurements.
+    """ 
+ 
+    firstDerv = abs(np.diff(data)) 
+    #set up first derivative threshold
+    offsetIndices = np.array(np.where(firstDerv>0.0075)[0]+1)
+#    offsetIndices = offsetIndices.astype(np.float64)      
+    
+##    #match up data before first step change    
+#    smoothData = np.zeros(len(data))    
+#    smoothData[:offsetIndices[0]] = data[:offsetIndices[0]]
+    
+    #offset data from point of interest onwards
+    for i in offsetIndices:
+        j = 1
+        if i < offsetIndices[-1]:
+            offset = data[i-1]-data[i]
+            
+            data[i:] += offset
+            
+        else:
+            offset = data[i]-data[i-1]
+            data[i:] += offset
+        j += 1
     return data
     
 def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter, 
                      numMethod, trueSyringeRotation, reloads, tempFluct, 
                      thermalExpCoeff):
-
+    """
+    Get the surface tension from the droplet and capillary images and all of 
+    the user inputs.
+    """
     #binarize image
     binarizedImage = ip.binarize_image(image)
-
+    #return nans if black image
     if np.all(binarizedImage == 255):
         surfTen  = np.nan
         dropVol  = np.nan
         volError = np.nan
+        bondNumber = np.nan
+        worthNum = np.nan
+        surfArea = np.nan
 
     else:
         #get interface coordinates
@@ -481,14 +531,14 @@ def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter,
         #offset vertical points     
         zOffset = -min(interfaceCoordinates[:,1])
         interfaceCoordinates = interfaceCoordinates + [0,zOffset]
-    
+#        plt.plot(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
         # Process capillary image    
         capillaryRotation,zCoords,pixelsConv = ip.get_capillary_rotation(capillaryImage,zOffset)        
           
         #isolate drop
         xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
         dropCoords = ip.isolate_drop(xCoords,zCoords,interfaceCoordinates)
-        
+#        plt.plot(dropCoords[:,0],dropCoords[:,1])
       
         #get magnification ratio
         magRatio = ip.get_magnification_ratio(pixelsConv, capillaryDiameter,
@@ -506,7 +556,9 @@ def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter,
         s,xe,apexRadiusGuess = bond_calc(xData,zData)
         surfTen = s_interp(s,xe,deltaRho)
         bondNumber = deltaRho*9.81*apexRadiusGuess**2/surfTen
-        dropVol = get_drop_volume(xData,zData,apexRadiusGuess) 
+        
+        dropVol = get_drop_volume(xData,zData,apexRadiusGuess)
+        surfArea = get_drop_SA(xData,zData,apexRadiusGuess)
         
         volError = get_volume_error(dropVol,thermalExpCoeff,magRatio,tempFluct)        
         
@@ -519,7 +571,9 @@ def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter,
                                                             reloads,
                                                             trueSyringeRotation)
         
-    return surfTen, dropVol,volError
+        worthNum = deltaRho*9.81*dropVol/(np.pi*surfTen*capillaryDiameter*10**-3)
+        
+    return surfTen,dropVol,volError,bondNumber,worthNum,surfArea
     
     
         
@@ -542,7 +596,9 @@ if __name__ == "__main__":
     #test drop volume function
     testDropVol = False
     #test DAQ temperature readings
-    testDAQtemp = True
+    testDAQtemp = False
+    #test offset for turbidity measurements
+    testTurbidityData = True
     
     if testObjFunV2 or testData or testArcSum or testInitBond or testDropVol:
         # Generate test data for objective functions
@@ -634,6 +690,47 @@ if __name__ == "__main__":
         dropVolume,volVec = get_drop_volume(xActual,zActual,r0,Bond_actual)
 
     if testDAQtemp:
+        temperature = np.zeros(100)
+        timeVec = np.zeros(20)
+        # Define plotting text features   
+        titleFont = {'family': 'serif',  
+        'color':  'darkred',  
+        'weight': 'bold',  
+        'size': 15,  
+        }  
+          
+        axesFont = {'weight': 'bold'}         
         
-        temperature = get_temperature()        
+#        plt.ion()
+        k = 0
+        while k<20:
+            for i in range(100):
+                temperature[i] = np.array(get_temperature())
+                
+            avgtemp = np.average(temperature)
+
+            timeVec[k]=np.array(time.time())                     
+            plt.scatter(k,avgtemp)
+            plt.xlabel('Sample Number', fontdict=axesFont)
+            plt.ylabel('Temperature (deg C)', fontdict=axesFont)
+            plt.ylim((21.5,25.5))
+            plt.title('Thermocouple Testing, Signal Averaging over ~15 sec',fontdict=titleFont)
+#            plt.pause(0.5)
+            k=k+1
+        avgTime = np.average(timeVec-timeVec[0])
         
+    if testTurbidityData:
+        
+        offsetData = remove_offsets(data)       
+        
+        # Define plotting text features
+        titleFont = {'family': 'serif','weight': 'bold','size': 15}
+        axesFont = {'weight': 'bold'}     
+        
+        plt.title('Drop Opacity, BHI Broth 48 Hour Test (0.1 Hz)',titleFont)
+        plt.plot(timeVec,offsetData,'bo',markeredgewidth=0.0,label='Drop Volume')
+        plt.xlabel('Time (hr)',fontdict=axesFont)
+        plt.xticks(np.arange(0,max(timeVec),10))
+        plt.ylabel('Histogram Comparison',fontdict=axesFont)
+#                  
+            
