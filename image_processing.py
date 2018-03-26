@@ -87,7 +87,8 @@ def get_interface_coordinates(binaryImage):
 #    data2 = max(contours,key=cv2.contourArea)
     data = data1.squeeze()
     interfaceCoords = np.reshape(data,(-1,2))
-    
+#    plt.plot(interfaceCoords[:,0],interfaceCoords[:,1])
+
     return interfaceCoords
     
 def get_interface_calibration_coordinates(edges):
@@ -192,7 +193,9 @@ def isolate_drop(lineCoordX, lineCoordZ, interfaceCoords):
 #    cutoffPoint = None        
     
     #give extra room for cutoff of droplet (view 15/16ths of droplet)
-    zCutOff = lineCoordZ - lineCoordZ/16    
+#    zCutOff = lineCoordZ - lineCoordZ/16    
+    
+    zCutOff = lineCoordZ
 
 ##    #loop to find the outline coordinate where the outline coordinate is below the line
 #    for i in range (0, len(interfaceCoords)):
@@ -434,21 +437,21 @@ def get_rotated_droplet(dropletCoords,rotOffset):
 def get_images_from_video(filename,directory):
 
     #create new folder for time lapse images
-    os.mkdir(directory + '/' + 'timeFrame')
+#    os.mkdir(directory + '/' + 'timeFrame')
     
     videoFile = directory + '/' + filename
-    outputDir = directory + '/' + 'timeFrame' + '/'
+    outputDir = directory + '/'
     
     #change directory for ffmpeg to be excecuted in command line through wrapper
     os.chdir('C:/ffmpeg/bin')
     
 
     videoFiles = ffmpy.FFmpeg(inputs = {videoFile: None}, 
-                              outputs = {outputDir +'TestImage%05d.jpg': None})
+                              outputs = {outputDir +'TestImage%04d.jpg': '-r 10'})
 
     return videoFiles
   
-
+    
 
               
 ######################## For Testing Purposes ################################# 
@@ -619,8 +622,8 @@ if __name__ == "__main__":
 
     #flag12: test for getting string interface coordinates
     if flag12:
-        dirName = 'C:/Research/Pendant Drop/Data/Video Testing'
-        filename = 'Video2.avi'
+        dirName = 'C:\Research\Pendant Drop\Demo'
+        filename = 'abner.avi'
         imageFiles = get_images_from_video(filename,dirName)
         imageFiles.run()
 
