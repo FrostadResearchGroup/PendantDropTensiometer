@@ -379,36 +379,33 @@ def get_volume_error(dropVolume,coeffThermalExpansion,
 
     return totalError   
 
-def get_droplet_profile(image,capImage,capillaryDiameter):
+def get_droplet_profile(image,capillaryImage,capillaryDiameter):
     """
     Maps out droplet profile.
     """
    
-    #loads image files from image_extraction.py
-    dropImage = ie.load_image_file(image)
-    capillaryImage = ie.load_image_file(capImage)
     
     #binarize image
-    binarizedImage = ip.binarize_image(dropImage)
-       
+    binarizedImage = ip.binarize_image(image)
+
     #get interface coordinates
     interfaceCoordinates = ip.get_interface_coordinates(binarizedImage)
-     
-    interfaceCoordinates = np.array(interfaceCoordinates)
 
+    interfaceCoordinates = np.array(interfaceCoordinates)
     #flip the coordinates vertically
-    interfaceCoordinates = interfaceCoordinates* [1,-1]
+    interfaceCoordinates *= [1,-1]
 
     #offset vertical points     
     zOffset = -min(interfaceCoordinates[:,1])
     interfaceCoordinates = interfaceCoordinates + [0,zOffset]
-
+#    plt.plot(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
     # Process capillary image    
     capillaryRotation,zCoords,pixelsConv = ip.get_capillary_rotation(capillaryImage,zOffset)        
       
     #isolate drop
     xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
     dropCoords = ip.isolate_drop(xCoords,zCoords,interfaceCoordinates)
+#    plt.plot(dropCoords[:,0],dropCoords[:,1])
   
     #get magnification ratio
     magRatio = ip.get_magnification_ratio(pixelsConv, capillaryDiameter,
@@ -424,12 +421,11 @@ def get_droplet_profile(image,capImage,capillaryDiameter):
     #reorder data points and estimate surface tension using 5 point method
     xData,zData = ip.reorder_data(scaledCoords)
     
-    #clump droplet profile data into nx2 array
     dropProfile = np.vstack((xData,zData))
     
     return dropProfile
 
-def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter, 
+def get_surf_tension(dropImage, capillaryImage, deltaRho, capillaryDiameter, 
                      numMethod, trueSyringeRotation, reloads, tempFluct, 
                      thermalExpCoeff):
     """
@@ -439,30 +435,69 @@ def get_surf_tension(image, capillaryImage, deltaRho, capillaryDiameter,
     
     """
 
-    dropProfile = get_droplet_profile(image,capillaryImage,capillaryDiameter)
+    #binarize image
+    binarizedImage = ip.binarize_image(dropImage)
+    #return nans if black image
+    if np.all(binarizedImage == 255):
+        surfTen  = np.nan
+        dropVol  = np.nan
+        volError = np.nan
+        bondNumber = np.nan
+        worthNum = np.nan
+        surfArea = np.nan
+
+    else:
+        #get interface coordinates
+        interfaceCoordinates = ip.get_interface_coordinates(binarizedImage)
     
-    xData = dropProfile[:,0]
-    zData = dropProfile[:,1]
+        interfaceCoordinates = np.array(interfaceCoordinates)
+        #flip the coordinates vertically
+        interfaceCoordinates *= [1,-1]
     
-    s,xe,apexRadiusGuess = bond_calc(xData,zData)
-    surfTen = s_interp(s,xe,deltaRho)
-    bondNumber = deltaRho*9.81*apexRadiusGuess**2/surfTen
+        #offset vertical points     
+        zOffset = -min(interfaceCoordinates[:,1])
+        interfaceCoordinates = interfaceCoordinates + [0,zOffset]
+#        plt.plot(interfaceCoordinates[:,0],interfaceCoordinates[:,1])
+        # Process capillary image    
+        capillaryRotation,zCoords,pixelsConv = ip.get_capillary_rotation(capillaryImage,zOffset)        
+          
+        #isolate drop
+        xCoords = [min(interfaceCoordinates[:,0]),max(interfaceCoordinates[:,0])] 
+        dropCoords = ip.isolate_drop(xCoords,zCoords,interfaceCoordinates)
+#        plt.plot(dropCoords[:,0],dropCoords[:,1])
+      
+        #get magnification ratio
+        magRatio = ip.get_magnification_ratio(pixelsConv, capillaryDiameter,
+                                              capillaryRotation)  
+        
+        #shift coordinates so apex is at 0,0
+        newCenter = [0,0]
+        shiftedCoords = ip.shift_coords(dropCoords[:,0],dropCoords[:,1],newCenter)
     
-    dropVol = get_drop_volume(xData,zData,apexRadiusGuess)
-    surfArea = get_drop_SA(xData,zData,apexRadiusGuess)
-    
-    volError = get_volume_error(dropVol,thermalExpCoeff,magRatio,tempFluct)        
-    
-    if numMethod == 2: # use all points
-        #run through optimization routine
-        surfTen,apexRadius,bondNumber = optimize_params(xData,zData,
-                                                        surfTen,
-                                                        apexRadiusGuess,
-                                                        deltaRho,
-                                                        reloads,
-                                                        trueSyringeRotation)
-    
-    worthNum = deltaRho*9.81*dropVol/(np.pi*surfTen*capillaryDiameter*10**-3)
+        #scale drop
+        scaledCoords = ip.scale_drop(shiftedCoords,magRatio)
+        
+        #reorder data points and estimate surface tension using 5 point method
+        xData,zData = ip.reorder_data(scaledCoords)
+        s,xe,apexRadiusGuess = bond_calc(xData,zData)
+        surfTen = s_interp(s,xe,deltaRho)
+        bondNumber = deltaRho*9.81*apexRadiusGuess**2/surfTen
+        
+        dropVol = get_drop_volume(xData,zData,apexRadiusGuess)
+        surfArea = get_drop_SA(xData,zData,apexRadiusGuess)
+        
+        volError = get_volume_error(dropVol,thermalExpCoeff,magRatio,tempFluct)        
+        
+        if numMethod == 2: # use all points
+            #run through optimization routine
+            surfTen,apexRadius,bondNumber = optimize_params(xData,zData,
+                                                            surfTen,
+                                                            apexRadiusGuess,
+                                                            deltaRho,
+                                                            reloads,
+                                                            trueSyringeRotation)
+        
+        worthNum = deltaRho*9.81*dropVol/(np.pi*surfTen*capillaryDiameter*10**-3)
         
     return surfTen,apexRadius
  
@@ -503,12 +538,13 @@ def elastic_model(elastMod,poissRatio,pressure,nPoints,L,deltaRho,hoopStrech,mer
     
     #set initial values
     s0 = 0
-    y0 = [0.00001,0.00001,0.00001,1]
+    y0 = [0.00001,0.00001,0.00001,0.000001]
     
     sVec = np.linspace(s0,s1,N) 
    
-    sol = odeint(ode_system_elastic,y0,sVec,args=(elastMod,poissRatio,pressure,deltaRho,
-                                                  hoopStrech,merStrech,surfTenRef))
+    sol = odeint(ode_system_elastic,y0,sVec,args=(pressure,elastMod,
+                        poissRatio,deltaRho,hoopStrech,
+                        merStrech,surfTenRef,),mxstep=500000)
 
     r = sol[:,1]
     z = sol[:,2]
@@ -531,7 +567,7 @@ def get_midpoint(coords):
     
     zAvg = np.average([zMin,zMax])
     
-    midPointIndex = np.argmin(np.abs(coords[:,1],zAvg))
+    midPointIndex = np.argmin(np.abs(coords[:,1]-zAvg))
     
     return zAvg,midPointIndex
 
@@ -555,15 +591,15 @@ def get_streches(refShapeCoords,defShapeCoords,apexRad):
     sumArcLenDef,defArcLenMP = get_data_arc_len(xDefLeft,xDefRight,zDefLeft,zDefRight,apexRad)
     
     #determine arc length values at droplet midpoint
-    defArcLenMP = defShapeCoords[defMidpointIndex]
-    refArcLenMP = refShapeCoords[refMidpointIndex]
+    defArcLenMP = np.sum(defShapeCoords[:defMidpointIndex])
+    refArcLenMP = np.sum(refShapeCoords[:refMidpointIndex])
     
     #determine r values at droplet midpoint
     rValRef = refShapeCoords[:,0][refMidpointIndex]
     rValDef = defShapeCoords[:,0][defMidpointIndex]
     
     #calculate strech values
-    merStrech  = defArcLenMP/refArcLenMP  
+    merStrech  = defArcLenMP/refArcLenMP
     hoopStrech = rValDef/rValRef
     
     return merStrech,hoopStrech
@@ -610,7 +646,7 @@ def objective_fun_v2_elastic(params,deltaRho,hoopStrech,merStrech,surfTenRef,
     
     #returning residual sum of squares
     rsq=np.sum(rxLeft**2)+np.sum(rxRight**2)
-    
+    print(rsq)
     return rsq    
     
 def optimize_params_elastic(defCoords,elastModGuess,poissRatioGuess,pressGuess,r0,
@@ -644,7 +680,7 @@ def optimize_params_elastic(defCoords,elastModGuess,poissRatioGuess,pressGuess,r
     for i in range(nReload):
         r=optimize.minimize(objective_fun_v2_elastic,initGuess,args=(deltaRho,
                             hoopStrech,merStrech,surfTenRef,xDataLeft,zDataLeft,
-                            xDataRight,zDataRight,intRange,trueRotation),
+                            xDataRight,zDataRight,intRange,trueRotation,r0),
                             method='Nelder-Mead',tol=1e-9)
     
         initGuess = [r.x[0],r.x[1],r.x[2]]
@@ -675,17 +711,18 @@ def get_elastic_properties(refImage,defImage,capillaryImage, deltaRho,
     refProfile = get_droplet_profile(refImage,capillaryImage,capillaryDiameter)
     
     #obtain droplet profile of deformed shape
-    defProfile = get_droplet_profile(refImage,capillaryImage,capillaryDiameter)
+    defProfile = get_droplet_profile(defImage,capillaryImage,capillaryDiameter)
     
-    
+#    plt.plot(defProfile[:,0],defProfile[:,1])
     #obtain surface tension of reference shape
     refSurfTen,r0 = get_surf_tension(refImage, capillaryImage, deltaRho, capillaryDiameter, 
                      numMethod, trueSyringeRotation, reloads, tempFluct, 
                      thermalExpCoeff)
     
+
     #obtain strech values
     strechMer,strechHoop = get_streches(refProfile,defProfile,r0)
-         
+    
     #initial guesses
     y2DGuess   = 0.05 #mN
     v2DGuess   = 0.5  
@@ -705,14 +742,22 @@ def get_elastic_properties(refImage,defImage,capillaryImage, deltaRho,
    
 if __name__ == "__main__":
 
+    #working directory name
+    dirName = 'C:/Research/Pendant Drop/Data/Biofilm Testing/Positive Contol Test (PA 14)/48 Hour Tests/Test 4/Droplet Compression/'
+
     #reference pictures from Hegemann et. al 
-    referenceImage = 'reference.png'
-    deformedImage  = 'deformed.png'
-    capillaryImage = 'capillary_image.png'
+    referenceImage = dirName + 'Reference_Image.jpg'
+    deformedImage  = dirName + 'Compressed_Image_1.jpg'
+    capillaryImage = dirName + 'Capillary_Image.jpg'
+    
+    #load images with image extraction script
+    capillaryImage = ie.load_image_file(capillaryImage)    
+    referenceImage = ie.load_image_file(referenceImage)
+    deformedImage = ie.load_image_file(deformedImage)
     
     #geometric and fluid properties 
     deltaRho = 998 #kg/m3
-    capDiameter = 2*10**-2 #m
+    capDiameter = 2.10 #m
     tempFluct = 2 #K
     thermalExpCoeff = 0.0002 #1/K
     
