@@ -504,7 +504,7 @@ def get_surf_tension(dropImage, capillaryImage, deltaRho, capillaryDiameter,
     
 ##############################################################################
 
-def ode_system_elastic(y,t,pressure,elastMod,poissRatio,deltaRho,hoopStrech,
+def ode_system_elastic(t,y,pressure,elastMod,poissRatio,deltaRho,hoopStrech,
                        merStrech,surfTenRef):
     
     """
@@ -525,6 +525,7 @@ def ode_system_elastic(y,t,pressure,elastMod,poissRatio,deltaRho,hoopStrech,
     
     return f
 
+
 def elastic_model(elastMod,poissRatio,pressure,nPoints,L,deltaRho,hoopStrech,merStrech,surfTenRef):
     """
     
@@ -534,7 +535,7 @@ def elastic_model(elastMod,poissRatio,pressure,nPoints,L,deltaRho,hoopStrech,mer
 
     # set solver
     solver = ode(ode_system_elastic)
-    solver.set_integrator('dopri5')
+    solver.set_integrator('dopri5',nsteps=10000)
     
     #sets parameter values when called by solver
     solver.set_f_params(pressure,elastMod,
@@ -553,9 +554,9 @@ def elastic_model(elastMod,poissRatio,pressure,nPoints,L,deltaRho,hoopStrech,mer
     #integration range and number of integration points
     s1=L
     N=nPoints 
-    
+
     s = np.linspace(s0, s1, N)
-    sol = np.empty((N, 4))
+    sol = np.zeros((N, 4))
     sol[0] = y0
     
     # Repeatedly call the `integrate` method to advance the
@@ -565,7 +566,7 @@ def elastic_model(elastMod,poissRatio,pressure,nPoints,L,deltaRho,hoopStrech,mer
         solver.integrate(s[k])
         sol[k] = solver.y
         k += 1
-        
+
     r = sol[:,1]
     z = sol[:,2]
     fi = sol[:,0]
@@ -666,12 +667,12 @@ def objective_fun_v2_elastic(params,deltaRho,hoopStrech,merStrech,surfTenRef,
     
     #returning residual sum of squares
     rsq=np.sum(rxLeft**2)+np.sum(rxRight**2)
-    print(rsq)
+#    print(rsq)
     return rsq    
     
 def optimize_params_elastic(defCoords,elastModGuess,poissRatioGuess,pressGuess,r0,
                             surfTenRef,hoopStrech,merStrech,deltaRho,nReload,
-                            trueRotation,nPoints=1000):
+                            trueRotation,nPoints):
     
     """
     Optimizes bondnumber, apex radius of curvature, and rotational angle to fit
@@ -697,21 +698,19 @@ def optimize_params_elastic(defCoords,elastModGuess,poissRatioGuess,pressGuess,r
     intRange,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
     
     # calling out optimization routine with reload
-    for i in range(nReload):
-        r=optimize.minimize(objective_fun_v2_elastic,initGuess,args=(deltaRho,
-                            hoopStrech,merStrech,surfTenRef,xDataLeft,zDataLeft,
-                            xDataRight,zDataRight,intRange,trueRotation,r0),
-                            method='Nelder-Mead',tol=1e-9)
-    
-        initGuess = [r.x[0],r.x[1],r.x[2]]
-        y2DFinal = r.x[0]
-        v2DFinal = r.x[1] 
-        pressureFinal = r.x[2]
-        
-        intRangeFinal,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
-        xModel,zModel,fiModel,tauMerModel = elastic_model(y2DFinal,v2DFinal,pressureFinal,
-                                                      nPoints,intRangeFinal,deltaRho,
-                                                      hoopStrech,merStrech,surfTenRef)
+
+    r=optimize.minimize(objective_fun_v2_elastic,initGuess,args=(deltaRho,
+                        hoopStrech,merStrech,surfTenRef,xDataLeft,zDataLeft,
+                        xDataRight,zDataRight,intRange,trueRotation,r0),
+                        method='Nelder-Mead',tol=1e-9)
+
+    initGuess = [r.x[0],r.x[1],r.x[2]]
+    y2DFinal = r.x[0]
+    v2DFinal = r.x[1] 
+    pressureFinal = r.x[2]
+
+    intRangeFinal,arcLength = get_data_arc_len(xDataLeft,zDataLeft,xDataRight,zDataRight,r0)
+    xModel,zModel,fiModel,tauMerModel = elastic_model(y2DFinal,v2DFinal,pressureFinal,nPoints,intRangeFinal,deltaRho,hoopStrech,merStrech,surfTenRef)
            
         
 
@@ -748,11 +747,13 @@ def get_elastic_properties(refImage,defImage,capillaryImage, deltaRho,
     v2DGuess   = 0.5  
     pressGuess = 101*10**3 #pascals
     
+    numberPoints = 1000
+    
     #throw into optimize_params_elastic
     xFit,zFit,y2D,v2D,pFinal = optimize_params_elastic(defProfile,y2DGuess,
                                         v2DGuess,pressGuess,r0,refSurfTen,
-                                        deltaRho,strechHoop,strechMer,deltaRho,
-                                        reloads,trueSyringeRotation)
+                                        strechHoop,strechMer,deltaRho,
+                                        reloads,trueSyringeRotation,numberPoints)
     
     
         
