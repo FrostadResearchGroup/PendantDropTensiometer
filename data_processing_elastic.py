@@ -532,20 +532,40 @@ def elastic_model(elastMod,poissRatio,pressure,nPoints,L,deltaRho,hoopStrech,mer
     
     """
 
+    # set solver
+    solver = ode(ode_system_elastic)
+    solver.set_integrator('dopri5')
+    
+    #sets parameter values when called by solver
+    solver.set_f_params(pressure,elastMod,
+                        poissRatio,deltaRho,hoopStrech,
+                        merStrech,surfTenRef)
+     
+    #set initial values
+    s0 = 0
+    y0 = [0.00001,0.00001,0.00001,0.00001]
+    solver.set_initial_value(y0,s0)
+     
+    # Create the array `t` of time values at which to compute
+    # the solution, and create an array to hold the solution.
+    # Put the initial value in the solution array.
+    
     #integration range and number of integration points
     s1=L
     N=nPoints 
     
-    #set initial values
-    s0 = 0
-    y0 = [0.00001,0.00001,0.00001,0.000001]
+    s = np.linspace(s0, s1, N)
+    sol = np.empty((N, 4))
+    sol[0] = y0
     
-    sVec = np.linspace(s0,s1,N) 
-   
-    sol = odeint(ode_system_elastic,y0,sVec,args=(pressure,elastMod,
-                        poissRatio,deltaRho,hoopStrech,
-                        merStrech,surfTenRef,),mxstep=500000)
-
+    # Repeatedly call the `integrate` method to advance the
+    # solution to time t[k], and save the solution in sol[k].
+    k = 1
+    while solver.successful() and solver.t < s1:
+        solver.integrate(s[k])
+        sol[k] = solver.y
+        k += 1
+        
     r = sol[:,1]
     z = sol[:,2]
     fi = sol[:,0]
